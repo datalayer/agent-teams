@@ -1,0 +1,305 @@
+---
+sidebar_position: 1
+title: Agent Teams
+slug: /
+---
+
+import DocCardList from '@theme/DocCardList';
+import { useDocsSidebar } from '@docusaurus/plugin-content-docs/client';
+import ModalImage from "react-modal-image";
+
+# 🤖 👥 Agent Teams
+
+**Generate programmatic tools from MCP Servers and Skills.**
+
+## What is Agent Teams?
+
+**Agent Teams** generates **programmatic tools** from two sources:
+
+1. **MCP Servers** - Connect to any MCP server and generate typed Python bindings for its tools
+2. **Skills** - Reusable code patterns that compose multiple tools into higher-level operations
+
+These programmatic tools can be:
+
+- **Used directly by an agent** - Import generated bindings and call tools from your agent's code
+- **Exposed as an MCP Server** - Serve the generated tools via MCP protocol for any MCP-compatible client
+
+Agent Teams uses [Code Sandboxes](https://code-sandboxes.datalayer.tech) for safe, isolated code execution.
+
+<div style={{display: 'flex', justifyContent: 'center', gap: '1rem'}}>
+  <div style={{width: '55%'}}>
+    <ModalImage
+      small="https://images.datalayer.io/products/mcp-codemode/demo-claude-list-tools.png"
+      large="https://images.datalayer.io/products/mcp-codemode/demo-claude-list-tools.png"
+      alt="Demo: list tools"
+    />
+  </div>
+  <div style={{width: '44%'}}>
+    <ModalImage
+      small="https://images.datalayer.io/products/mcp-codemode/demo-claude-execute-code.png"
+      large="https://images.datalayer.io/products/mcp-codemode/demo-claude-execute-code.png"
+      alt="Demo: execute code"
+    />
+  </div>
+</div>
+
+## Package Scope
+
+Agent Teams is the **tool generation layer** in the Datalayer AI stack:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     agent-runtimes                          │
+│            (Agent hosting, protocols, UI)                   │
+├──────────────────────────┬──────────────────────────────────┤
+│      agent-skills        │         agent-teams           │  ◀── You are here
+│  (skills management)     │  (tool generation from MCP/Skills)│
+├──────────────────────────┴──────────────────────────────────┤
+│                    code-sandboxes                           │
+│          (Safe code execution environment)                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**What Agent Teams Does:**
+- ✅ Generate programmatic tools from MCP Servers (typed Python bindings)
+- ✅ Generate programmatic tools from Skills (reusable compositions)
+- ✅ Provide progressive tool discovery (search_tools, get_tool_details)
+- ✅ Execute Python code that composes tools (CodeModeExecutor)
+- ✅ Expose generated tools directly to agents or via MCP Server
+
+**Not Responsible For:**
+- ❌ Raw code execution isolation (→ code-sandboxes)
+- ❌ Skill lifecycle management (→ agent-skills)
+- ❌ Agent protocols or UI components (→ agent-runtimes)
+
+## Why Code Mode?
+
+Traditional AI agents call tools one at a time, with each call requiring an LLM inference round-trip. This approach has limitations:
+
+- **Inefficient**: Multiple LLM calls for multi-step operations
+- **Error-prone**: No robust error handling between tool calls
+- **Limited**: Cannot leverage programming constructs like loops or conditionals
+- **Not reusable**: Patterns must be rediscovered each time
+
+Agent Teams solves these by letting agents **write code** that composes tools:
+
+```python
+# Instead of many individual tool calls...
+# The agent writes code that orchestrates tools programmatically
+
+from generated.servers.filesystem import read_file, write_file
+import asyncio
+
+# Read multiple files in parallel
+files = ["config.json", "data.csv", "readme.md"]
+contents = await asyncio.gather(*[
+    read_file({"path": f"/data/{f}"}) for f in files
+])
+
+# Process with try/except for robustness
+for i, content in enumerate(contents):
+    try:
+        processed = content.upper()
+        await write_file({"path": f"/output/{files[i]}", "content": processed})
+    except Exception as e:
+        print(f"Failed to process {files[i]}: {e}")
+```
+
+Same task, same MCP server — Code Mode uses significantly fewer tokens by composing tools in code instead of multiple LLM round-trips.
+
+<div style={{display: 'flex', justifyContent: 'center', gap: '1rem'}}>
+  <div style={{width: '50%', textAlign: 'center'}}>
+    <strong>Without Code Mode</strong>
+    <ModalImage
+      small="https://images.datalayer.io/products/mcp-codemode/tokens-non-codemode.png"
+      large="https://images.datalayer.io/products/mcp-codemode/tokens-non-codemode.png"
+      alt="Without Code Mode"
+    />
+  </div>
+  <div style={{width: '50%', textAlign: 'center'}}>
+    <strong>With Code Mode</strong>
+    <ModalImage
+      small="https://images.datalayer.io/products/mcp-codemode/tokens-codemode.png"
+      large="https://images.datalayer.io/products/mcp-codemode/tokens-codemode.png"
+      alt="With Code Mode"
+    />
+  </div>
+</div>
+
+<p align="center">
+  <em>Prompt: "Generate 2000 words of random text and write to a file"</em>
+</p>
+
+
+## Before vs After (Codemode pattern)
+
+Codemode follows the same “wrap tools, then let the model write code” pattern popularized by Cloudflare’s Code Mode. The flow looks like this:
+
+**Before (traditional tool calls):** the model calls each tool directly.
+
+**After (Codemode):** you give the model meta-tools that let it discover tools and execute Python code that composes them.
+
+Example (Agent Teams, Python):
+
+```python
+from agent_teams import ToolRegistry, CodeModeExecutor, MCPServerConfig
+
+# Configure the registry with MCP servers
+registry = ToolRegistry()
+registry.add_server(MCPServerConfig(
+    name="filesystem",
+    transport="stdio",
+    command="npx",
+    args=["-y", "@anthropic/mcp-server-filesystem", "/tmp"],
+))
+await registry.discover_all()
+
+# Execute code that composes tools
+executor = CodeModeExecutor(registry)
+await executor.setup()
+
+result = await executor.execute("""
+    from generated.servers.filesystem import read_file, write_file
+    content = await read_file({"path": "/tmp/input.txt"})
+    await write_file({"path": "/tmp/output.txt", "content": content.upper()})
+""")
+```
+
+**In Agent Teams**, the same idea is exposed as **meta-tools** (`list_tool_names`, `search_tools`, `execute_code`, etc.). When Codemode is enabled in agent-runtimes, selected MCP servers are converted into Codemode tool bindings instead of being exposed directly as individual tools.
+
+## Key Features
+
+### 🔌 Generate from MCP Servers
+
+Connect to any MCP server and generate typed Python bindings:
+
+```python
+from agent_teams import ToolRegistry, MCPServerConfig
+
+registry = ToolRegistry()
+registry.add_server(MCPServerConfig(
+    name="filesystem",
+    transport="stdio",
+    command="npx",
+    args=["-y", "@anthropic/mcp-server-filesystem", "/workspace"]
+))
+await registry.discover_all()
+
+# Now use the generated bindings
+from generated.servers.filesystem import read_file, write_file
+content = await read_file({"path": "/workspace/data.txt"})
+```
+
+See [MCP Servers](./mcp-servers/index.mdx) for complete documentation.
+
+### 🎯 Generate from Skills
+
+Use reusable code patterns that compose multiple tools:
+
+```python
+# skills/batch_process.py
+async def batch_process(input_dir: str, output_dir: str) -> dict:
+    from generated.servers.filesystem import list_directory, read_file, write_file
+    
+    entries = await list_directory({"path": input_dir})
+    for entry in entries["entries"]:
+        content = await read_file({"path": f"{input_dir}/{entry}"})
+        await write_file({"path": f"{output_dir}/{entry}", "content": content.upper()})
+    return {"processed": len(entries["entries"])}
+
+# Use the skill
+from skills.batch_process import batch_process
+result = await batch_process("/data/input", "/data/output")
+```
+
+See [Skills](./skills/index.mdx) for complete documentation.
+
+### 🔍 Progressive Tools Discovery
+
+Large tool catalogs (100+ tools) are overwhelming for LLMs. The **Tool Search Tool** enables progressive discovery:
+
+```python
+# Find relevant tools without loading all definitions
+result = await search_tools("file operations", limit=10)
+for tool in result["tools"]:
+    print(f"{tool['name']}: {tool['description']}")
+```
+
+See [Tools Discovery](./discovery/index.mdx) for complete documentation.
+
+### 🔌 Use Directly or Expose as MCP Server
+
+The generated programmatic tools can be:
+
+**Used directly by an agent:**
+```python
+from pydantic_ai import Agent
+from agent_teams import CodemodeToolset
+
+agent = Agent(
+    "anthropic:claude-sonnet-4-20250514",
+    toolsets=[CodemodeToolset(registry)]
+)
+result = await agent.run("Process all files in /data")
+```
+
+See [Integrations](./integrations/index.mdx) for complete documentation.
+
+**Exposed as an MCP Server:**
+```python
+from agent_teams import codemode_server, configure_server
+
+# Configure with your registry
+configure_server(config=config, registry=registry)
+codemode_server.run()
+```
+
+Or run directly:
+```bash
+python -m agent_teams.server --workspace /workspace
+```
+
+See [MCP Server](./mcp-server/index.mdx) for complete documentation.
+
+## Quick Start
+
+```bash
+pip install agent-teams
+```
+
+```python
+from agent_teams import ToolRegistry, CodeModeExecutor, MCPServerConfig
+
+# Set up registry with MCP servers
+registry = ToolRegistry()
+registry.add_server(MCPServerConfig(
+    name="filesystem",
+    transport="stdio",
+    command="npx",
+    args=["-y", "@anthropic/mcp-server-filesystem", "/tmp"]
+))
+await registry.discover_all()
+
+# Execute code that composes tools
+executor = CodeModeExecutor(registry)
+await executor.setup()
+
+result = await executor.execute("""
+    from generated.servers.filesystem import read_file, write_file
+    
+    content = await read_file({"path": "/tmp/input.txt"})
+    await write_file({"path": "/tmp/output.txt", "content": content.upper()})
+""")
+```
+
+## Documentation
+
+<DocCardList />
+
+## Inspiration
+
+Agent Teams is inspired by:
+- [Cloudflare Code Mode](https://blog.cloudflare.com/code-mode) - The better way to use MCP
+- [Cloudflare's open-source Code Mode agent](https://github.com/cloudflare/agents/blob/main/docs/codemode.md)
+- [Anthropic Code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) - Building more efficient agents
+- [Anthropic Introducing advanced tool use](https://www.anthropic.com/engineering/advanced-tool-use) - Claude Developer Platform
