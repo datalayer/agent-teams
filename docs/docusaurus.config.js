@@ -38,9 +38,33 @@ module.exports = {
       items: [
         {
           type: 'doc',
+          docId: 'getting-started/index',
+          position: 'left',
+          label: 'Getting Started',
+        },
+        {
+          type: 'doc',
+          docId: 'architecture/index',
+          position: 'left',
+          label: 'Architecture',
+        },
+        {
+          type: 'doc',
           docId: 'protocols/index',
           position: 'left',
           label: 'Protocols',
+        },
+        {
+          type: 'doc',
+          docId: 'cli/index',
+          position: 'left',
+          label: 'CLI',
+        },
+        {
+          type: 'doc',
+          docId: 'api-reference/index',
+          position: 'left',
+          label: 'API',
         },
         {
           href: 'https://discord.gg/YQFwvmSSuR',

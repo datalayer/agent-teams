@@ -111,6 +111,20 @@ from .orchestration.sequential import SequentialOrchestrator
 from .orchestration.supervisor import SupervisorOrchestrator
 
 # ---------------------------------------------------------------------------
+# Health, Reactions, Hooks
+# ---------------------------------------------------------------------------
+from .health import HealthConfig, HealthMonitor, HealthState, MemberHealth
+from .hooks import Hook, HookEvent, HookRegistry, HookResult
+from .reactions import (
+    ReactionAction,
+    ReactionConfig,
+    ReactionEngine,
+    ReactionPriority,
+    ReactionState,
+    ReactionTrigger,
+)
+
+# ---------------------------------------------------------------------------
 # Manager
 # ---------------------------------------------------------------------------
 from .manager import TeamManager
@@ -119,6 +133,44 @@ from .manager import TeamManager
 # App factory
 # ---------------------------------------------------------------------------
 from .app import create_app
+
+# ---------------------------------------------------------------------------
+# A2A integration (optional — requires fasta2a)
+# ---------------------------------------------------------------------------
+try:
+    from .a2a import (
+        A2AChannel,
+        A2ATeamApp,
+        CompositeChannel,
+        TEAM_COORDINATION_URI,
+        TeamMemberWorker,
+        TeamTaskStorage,
+        agent_extension,
+        create_a2a_team_app,
+        extract_team_metadata,
+        is_team_extension_active,
+        make_health_metadata,
+        make_reaction_metadata,
+        make_task_metadata,
+    )
+
+    _A2A_EXPORTS = [
+        "A2AChannel",
+        "A2ATeamApp",
+        "CompositeChannel",
+        "TEAM_COORDINATION_URI",
+        "TeamMemberWorker",
+        "TeamTaskStorage",
+        "agent_extension",
+        "create_a2a_team_app",
+        "extract_team_metadata",
+        "is_team_extension_active",
+        "make_health_metadata",
+        "make_reaction_metadata",
+        "make_task_metadata",
+    ]
+except ImportError:
+    _A2A_EXPORTS = []
 
 __all__ = [
     "__version__",
@@ -171,8 +223,25 @@ __all__ = [
     "ParallelOrchestrator",
     "SequentialOrchestrator",
     "SupervisorOrchestrator",
+    # Health, Reactions, Hooks
+    "HealthConfig",
+    "HealthMonitor",
+    "HealthState",
+    "Hook",
+    "HookEvent",
+    "HookRegistry",
+    "HookResult",
+    "MemberHealth",
+    "ReactionAction",
+    "ReactionConfig",
+    "ReactionEngine",
+    "ReactionPriority",
+    "ReactionState",
+    "ReactionTrigger",
     # Manager
     "TeamManager",
     # App
     "create_app",
+    # A2A (conditional)
+    *_A2A_EXPORTS,
 ]

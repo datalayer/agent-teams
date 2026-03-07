@@ -31,11 +31,14 @@ import logging
 from datetime import datetime
 from typing import Any, Callable, Coroutine, Optional
 
+from .health import HealthConfig, HealthMonitor, HealthState
+from .hooks import HookEvent, HookRegistry, HookResult
 from .orchestration.base import BaseOrchestrator, MemberProxy, OrchestratorContext
 from .orchestration.parallel import ParallelOrchestrator
 from .orchestration.sequential import SequentialOrchestrator
 from .orchestration.supervisor import SupervisorOrchestrator
 from .protocol.channel import InMemoryChannel, TeamChannel
+from .reactions import ReactionEngine, ReactionTrigger
 from .state.artifact_store import ArtifactStore, InMemoryArtifactStore
 from .state.task_list import SharedTaskList
 from .types import (
@@ -110,6 +113,7 @@ class TeamManager:
         channel: TeamChannel | None = None,
         artifact_store: ArtifactStore | None = None,
         member_run_factory: MemberRunFactory | None = None,
+        health_config: HealthConfig | None = None,
     ) -> None:
         self._teams: dict[str, TeamState] = {}
         self._orchestrators: dict[str, BaseOrchestrator] = {}
@@ -122,6 +126,11 @@ class TeamManager:
         self._a2a_brokers: dict[str, Any] = {}
         self._a2a_workers: dict[str, Any] = {}
         self._a2a_storages: dict[str, Any] = {}
+        # Health monitoring, reaction engine, hooks
+        self._health_config = health_config or HealthConfig()
+        self._health_monitors: dict[str, HealthMonitor] = {}
+        self._reaction_engines: dict[str, ReactionEngine] = {}
+        self._hooks = HookRegistry()
 
     def set_member_run_factory(self, factory: MemberRunFactory) -> None:
         """Set the factory that creates run functions for agent members.
@@ -131,6 +140,19 @@ class TeamManager:
         prompt on the underlying agent runtime.
         """
         self._member_run_factory = factory
+
+    @property
+    def hooks(self) -> HookRegistry:
+        """Access the hook registry to add lifecycle hooks."""
+        return self._hooks
+
+    def get_health_monitor(self, team_id: str) -> HealthMonitor | None:
+        """Get the health monitor for a team."""
+        return self._health_monitors.get(team_id)
+
+    def get_reaction_engine(self, team_id: str) -> ReactionEngine | None:
+        """Get the reaction engine for a team."""
+        return self._reaction_engines.get(team_id)
 
     # ------------------------------------------------------------------
     # Team lifecycle
@@ -258,6 +280,30 @@ class TeamManager:
 
         self._orchestrators[team_id] = orchestrator
         self._contexts[team_id] = ctx
+
+        # -- Set up health monitoring -----------------------------------------
+        monitor = HealthMonitor(config=self._health_config)
+        for mid in members:
+            monitor.register(mid)
+
+        # Wire health callbacks to reaction engine
+        reactions = ReactionEngine()
+        monitor.on_stale = self._make_health_callback(team_id, reactions, ReactionTrigger.MEMBER_UNRESPONSIVE)
+        monitor.on_unresponsive = self._make_health_callback(team_id, reactions, ReactionTrigger.MEMBER_UNRESPONSIVE)
+        monitor.on_stuck = self._make_health_callback(team_id, reactions, ReactionTrigger.MEMBER_STUCK)
+        monitor.on_dead = self._make_health_callback(team_id, reactions, ReactionTrigger.MEMBER_DEAD)
+        monitor.on_mass_death = lambda ids: logger.critical(
+            "Mass death detected in team %s: %s", team_id, ids
+        )
+
+        self._health_monitors[team_id] = monitor
+        self._reaction_engines[team_id] = reactions
+
+        # Run lifecycle hook
+        hook_result = await self._hooks.run(
+            HookEvent.POST_TEAM_START, team_id=team_id, config=team.config
+        )
+
         team.status = TeamStatus.RUNNING
 
         team.events.append(
@@ -276,7 +322,17 @@ class TeamManager:
         if team.status not in (TeamStatus.RUNNING, TeamStatus.PAUSED):
             raise ValueError(f"Cannot stop team in {team.status} state")
 
+        await self._hooks.run(HookEvent.PRE_TEAM_STOP, team_id=team_id)
+
         team.status = TeamStatus.STOPPING
+
+        # Stop health monitor
+        monitor = self._health_monitors.pop(team_id, None)
+        if monitor:
+            await monitor.stop()
+
+        # Remove reaction engine
+        self._reaction_engines.pop(team_id, None)
 
         # Cancel execution task if running
         exec_task = self._execution_tasks.pop(team_id, None)
@@ -314,6 +370,7 @@ class TeamManager:
             )
         )
 
+        await self._hooks.run(HookEvent.POST_TEAM_STOP, team_id=team_id)
         logger.info("Team '%s' stopped", team.config.name)
 
     async def pause_team(self, team_id: str) -> None:
@@ -390,10 +447,23 @@ class TeamManager:
 
         await ctx.task_list.add(task)
 
+        # Pre-assign hook
+        hook_result = await self._hooks.run(
+            HookEvent.PRE_TASK_ASSIGN, team_id=team_id, task=task
+        )
+        if not hook_result.allow:
+            logger.info("Hook blocked task assignment: %s", hook_result.reason)
+            team.tasks.append(task)
+            return task
+
         # Dispatch immediately via orchestrator
         assigned = await orchestrator.assign_task(task)
         if not assigned:
             logger.warning("Task %s could not be assigned immediately", task.id)
+
+        await self._hooks.run(
+            HookEvent.POST_TASK_ASSIGN, team_id=team_id, task=task, assigned=assigned
+        )
 
         team.tasks.append(task)
         return task
@@ -537,6 +607,26 @@ class TeamManager:
     # ------------------------------------------------------------------
     # A2A (fasta2a) integration
     # ------------------------------------------------------------------
+
+    def _make_health_callback(
+        self,
+        team_id: str,
+        reactions: ReactionEngine,
+        trigger: ReactionTrigger,
+    ) -> Callable[[str], None]:
+        """Create a callback that fires a reaction when a health event occurs."""
+        def _cb(member_id: str) -> None:
+            team = self._teams.get(team_id)
+            if team:
+                team.events.append(
+                    TeamEvent(
+                        type=EventType.MEMBER_ERROR,
+                        source=member_id,
+                        message=f"Health event {trigger.value} for member {member_id}",
+                    )
+                )
+                reactions.fire(trigger, member_id)
+        return _cb
 
     def _resolve_channel(
         self,

@@ -38,14 +38,11 @@ from typing import Any
 
 from fasta2a import FastA2A, Skill
 from fasta2a.broker import InMemoryBroker
-from fasta2a.schema import (
-    AgentCapabilities,
-    AgentCard,
-)
 from fasta2a.storage import InMemoryStorage, StreamingStorageWrapper
 
 from ..manager import TeamManager
 from ..types import TeamConfig
+from .extensions import agent_extension
 from .storage import TeamTaskStorage
 from .worker import TeamMemberWorker
 
@@ -113,15 +110,23 @@ class A2ATeamApp:
             members=members,
         )
 
-        # Build agent card
+        # Build skills from team members
         skills = _build_skills_from_config(config)
-        agent_card = _build_agent_card(config, agent_url, skills)
+
+        # Build A2A extension declaration
+        team_ext = agent_extension()
 
         # Create the FastA2A application
         self.app = FastA2A(
             storage=self.storage,
             broker=self.broker,
-            agent_card=agent_card,
+            name=config.name,
+            description=config.description or f"Agent team: {config.name}",
+            url=agent_url,
+            version="0.1.0",
+            skills=skills,
+            extensions=[team_ext],
+            streaming=enable_streaming,
         )
 
     def update_members(self, members: dict[str, Any]) -> None:
@@ -169,28 +174,6 @@ def create_a2a_team_app(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _build_agent_card(
-    config: TeamConfig,
-    agent_url: str,
-    skills: list[Skill],
-) -> AgentCard:
-    """Build an A2A AgentCard from a team configuration."""
-    return AgentCard(
-        name=config.name,
-        description=config.description or f"Agent team: {config.name}",
-        url=agent_url,
-        version="0.1.0",
-        skills=skills,
-        capabilities=AgentCapabilities(
-            streaming=True,
-            push_notifications=False,
-            state_transition_history=True,
-        ),
-        default_input_modes=["text/plain"],
-        default_output_modes=["text/plain"],
-    )
 
 
 def _build_skills_from_config(config: TeamConfig) -> list[Skill]:

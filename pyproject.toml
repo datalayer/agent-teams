@@ -25,7 +25,11 @@ dependencies = [
     "fastapi>=0.100",
     "httpx>=0.24",
     "uvicorn[standard]>=0.20",
+    "typer>=0.9",
 ]
+
+[project.scripts]
+agent-teams = "agent_teams.cli:main"
 
 [project.optional-dependencies]
 pydantic-ai = [
@@ -33,7 +37,7 @@ pydantic-ai = [
     "pydantic-ai-slim",
 ]
 a2a = [
-    "a2a-sdk>=0.2",
+    "fasta2a",
 ]
 mcp = [
     "mcp[cli]>=1.0",
@@ -41,7 +45,7 @@ mcp = [
 all = [
     "agent_teams[pydantic-ai,a2a,mcp]",
 ]
-test = ["pytest>=7.0", "pytest-asyncio>=0.21", "httpx>=0.24"]
+test = ["pytest>=7.0", "pytest-asyncio>=0.21", "httpx>=0.24", "fasta2a", "anyio"]
 lint = ["mdformat>0.7", "mdformat-gfm>=0.3.5", "ruff"]
 typing = ["mypy>=0.990"]
 
@@ -62,6 +66,7 @@ asyncio_mode = "auto"
 filterwarnings = [
   "error",
   "ignore:There is no current event loop:DeprecationWarning",
+  "ignore:datetime.datetime.utcnow:DeprecationWarning",
   "module:make_current is deprecated:DeprecationWarning",
   "module:clear_current is deprecated:DeprecationWarning",
   "module:Jupyter is migrating its paths to use standard platformdirs:DeprecationWarning",

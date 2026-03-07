@@ -154,7 +154,7 @@ class TestTeamState:
     def test_initial_state(self):
         members = [AgentMemberConfig(name="a", role="worker")]
         config = TeamConfig(name="test", members=members)
-        state = TeamState(config=config)
+        state = TeamState(id=config.id, config=config)
         assert state.status == TeamStatus.DRAFT
         assert state.events == []
         assert state.tasks == []
@@ -162,7 +162,7 @@ class TestTeamState:
     def test_state_serialization_roundtrip(self):
         members = [AgentMemberConfig(name="a", role="worker")]
         config = TeamConfig(name="test", members=members)
-        state = TeamState(config=config)
+        state = TeamState(id=config.id, config=config)
         data = state.model_dump(mode="json")
         restored = TeamState.model_validate(data)
         assert restored.config.name == "test"
@@ -170,7 +170,7 @@ class TestTeamState:
     def test_team_summary(self):
         members = [AgentMemberConfig(name="a", role="worker")]
         config = TeamConfig(name="summary-team", members=members)
-        state = TeamState(config=config, status=TeamStatus.RUNNING)
+        state = TeamState(id=config.id, config=config, status=TeamStatus.RUNNING)
         summary = TeamSummary(
             id=config.id,
             name=config.name,

@@ -236,8 +236,16 @@ class TeamTaskStorage(Storage[dict[str, Any]]):
 
         # Apply status transition
         if team_status == TaskStatus.IN_PROGRESS:
+            # Ensure task is assigned before starting
+            if task.status == TaskStatus.PENDING:
+                await self._task_list.claim(task_id, task.assigned_to or "a2a")
             await self._task_list.start(task_id)
         elif team_status == TaskStatus.COMPLETED:
+            # Ensure task is in a completable state
+            if task.status == TaskStatus.PENDING:
+                await self._task_list.claim(task_id, task.assigned_to or "a2a")
+            if task.status == TaskStatus.ASSIGNED:
+                await self._task_list.start(task_id)
             result = TaskResult(
                 task_id=task_id,
                 member_id=task.assigned_to or "",

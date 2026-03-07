@@ -1,0 +1,239 @@
+---
+title: CLI Reference
+---
+
+# CLI Reference
+
+Agent Teams provides a command-line interface built with [Typer](https://typer.tiangolo.com/). The CLI communicates with the Agent Teams REST API server.
+
+## Installation
+
+The CLI is installed automatically with the package:
+
+```bash
+pip install agent-teams
+```
+
+The entry point is `agent-teams`:
+
+```bash
+agent-teams --help
+```
+
+## Commands
+
+### `serve`
+
+Start the Agent Teams API server.
+
+```bash
+agent-teams serve [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--host` | `0.0.0.0` | Host to bind to |
+| `--port` | `8765` | Port to listen on |
+| `--reload` | `false` | Enable auto-reload for development |
+
+**Example:**
+
+```bash
+agent-teams serve --port 9000 --reload
+```
+
+---
+
+### `create`
+
+Create a new team from a YAML or JSON configuration file.
+
+```bash
+agent-teams create CONFIG_PATH [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--server` | `http://localhost:8765` | Server URL |
+
+**Example:**
+
+```bash
+agent-teams create team.yaml
+agent-teams create config.json --server http://myserver:9000
+```
+
+**Config file format (YAML):**
+
+```yaml
+name: research-team
+execution_mode: parallel
+members:
+  - name: researcher
+    model: openai:gpt-4o
+    system_prompt: You are a research analyst.
+  - name: writer
+    model: anthropic:claude-sonnet-4-20250514
+    system_prompt: You are a technical writer.
+supervisor:
+  member_name: researcher
+  review_required: true
+```
+
+---
+
+### `list`
+
+List all teams on the server.
+
+```bash
+agent-teams list [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--server` | `http://localhost:8765` | Server URL |
+
+---
+
+### `status`
+
+Show detailed status of a team.
+
+```bash
+agent-teams status TEAM_ID [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--server` | `http://localhost:8765` | Server URL |
+
+---
+
+### `start`
+
+Start a team (transition from `draft` or `stopped` to `running`).
+
+```bash
+agent-teams start TEAM_ID [OPTIONS]
+```
+
+---
+
+### `stop`
+
+Stop a running or paused team.
+
+```bash
+agent-teams stop TEAM_ID [OPTIONS]
+```
+
+---
+
+### `pause`
+
+Pause a running team.
+
+```bash
+agent-teams pause TEAM_ID [OPTIONS]
+```
+
+---
+
+### `resume`
+
+Resume a paused team.
+
+```bash
+agent-teams resume TEAM_ID [OPTIONS]
+```
+
+---
+
+### `delete`
+
+Delete a team. The team must be stopped first (or use `--force`).
+
+```bash
+agent-teams delete TEAM_ID [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--force` | `false` | Force deletion even if running |
+| `--server` | `http://localhost:8765` | Server URL |
+
+---
+
+### `assign`
+
+Assign a task to a team.
+
+```bash
+agent-teams assign TEAM_ID DESCRIPTION [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--priority` | `medium` | Task priority (`low`, `medium`, `high`, `critical`) |
+| `--assigned-to` | | Assign to a specific member |
+| `--server` | `http://localhost:8765` | Server URL |
+
+**Example:**
+
+```bash
+agent-teams assign abc123 "Analyse Q4 revenue trends" --priority high
+agent-teams assign abc123 "Write summary" --assigned-to writer
+```
+
+---
+
+### `metrics`
+
+Show team metrics (tasks completed, failed, active members, etc.).
+
+```bash
+agent-teams metrics TEAM_ID [OPTIONS]
+```
+
+---
+
+### `events`
+
+Show recent team events.
+
+```bash
+agent-teams events TEAM_ID [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--limit` | `50` | Maximum number of events to show |
+| `--server` | `http://localhost:8765` | Server URL |
+
+## Typical Workflow
+
+```bash
+# 1. Start the server
+agent-teams serve &
+
+# 2. Create a team
+agent-teams create team.yaml
+# Output: Created team: abc-123-def
+
+# 3. Start the team
+agent-teams start abc-123-def
+
+# 4. Assign tasks
+agent-teams assign abc-123-def "Research recent AI papers" --priority high
+agent-teams assign abc-123-def "Write executive summary"
+
+# 5. Monitor progress
+agent-teams status abc-123-def
+agent-teams metrics abc-123-def
+agent-teams events abc-123-def
+
+# 6. Clean up
+agent-teams stop abc-123-def
+agent-teams delete abc-123-def
+```

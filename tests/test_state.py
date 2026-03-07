@@ -14,6 +14,7 @@ from agent_teams.types import (
     Artifact,
     TaskDefinition,
     TaskPriority,
+    TaskResult,
     TaskStatus,
 )
 
@@ -53,7 +54,7 @@ class TestSharedTaskList:
         await tl.add(t1)
         await tl.add(t2)
 
-        available = await tl.get_available()
+        available = tl.get_available()
         ids = [t.id for t in available]
         assert t1.id in ids
         assert t2.id not in ids  # blocked by dependency
@@ -64,9 +65,13 @@ class TestSharedTaskList:
         await tl.add(t1)
         await tl.add(t2)
 
-        await tl.complete(t1.id, result="done")
+        # Need to claim + start before completing
+        await tl.claim(t1.id, "w1")
+        await tl.start(t1.id)
+        result = TaskResult(task_id=t1.id, member_id="w1", status=TaskStatus.COMPLETED, output="done")
+        await tl.complete(t1.id, result=result)
 
-        available = await tl.get_available()
+        available = tl.get_available()
         ids = [t.id for t in available]
         assert t2.id in ids  # now unblocked
 
@@ -102,7 +107,8 @@ class TestSharedTaskList:
         await tl.add(task)
         await tl.claim(task.id, "worker-1")
         await tl.start(task.id)
-        await tl.complete(task.id, result="Done!")
+        result = TaskResult(task_id=task.id, member_id="worker-1", status=TaskStatus.COMPLETED, output="Done!")
+        await tl.complete(task.id, result=result)
 
         t = await tl.get(task.id)
         assert t.status == TaskStatus.COMPLETED
@@ -145,7 +151,7 @@ class TestSharedTaskList:
         await tl.claim(t1.id, "w1")
         await tl.claim(t2.id, "w2")
 
-        tasks = await tl.get_by_member("w1")
+        tasks = tl.get_by_member("w1")
         assert len(tasks) == 1
         assert tasks[0].id == t1.id
 
@@ -156,7 +162,7 @@ class TestSharedTaskList:
         await tl.add(t2)
         await tl.claim(t1.id, "w1")
 
-        pending = await tl.get_by_status(TaskStatus.PENDING)
+        pending = tl.get_by_status(TaskStatus.PENDING)
         assert len(pending) == 1
         assert pending[0].id == t2.id
 
@@ -167,12 +173,12 @@ class TestSharedTaskList:
         await tl.add(t2)
         await tl.claim(t1.id, "w1")
         await tl.start(t1.id)
-        await tl.complete(t1.id, result="ok")
+        result = TaskResult(task_id=t1.id, member_id="w1", status=TaskStatus.COMPLETED, output="ok")
+        await tl.complete(t1.id, result=result)
 
-        stats = await tl.stats()
-        assert stats["total"] == 2
-        assert stats["completed"] == 1
-        assert stats["pending"] == 1
+        stats = tl.stats
+        assert stats.get("completed", 0) == 1
+        assert stats.get("pending", 0) == 1
 
     async def test_priority_ordering(self, tl: SharedTaskList):
         low = TaskDefinition(title="Low", description="L", priority=TaskPriority.LOW)
@@ -182,7 +188,7 @@ class TestSharedTaskList:
         await tl.add(low)
         await tl.add(critical)
 
-        available = await tl.get_available()
+        available = tl.get_available()
         assert available[0].id == critical.id  # higher priority first
 
 

@@ -136,7 +136,9 @@ class TestTeamManagerMetrics:
         config = make_team_config()
         team_id = await mgr.create_team(config)
         metrics = mgr.get_metrics(team_id)
-        assert metrics.total_tasks == 0
+        assert metrics.tasks_completed == 0
+        assert metrics.tasks_pending == 0
+        assert metrics.tasks_failed == 0
 
     async def test_get_events(self, mgr: TeamManager):
         config = make_team_config()

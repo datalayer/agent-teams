@@ -165,7 +165,9 @@ class TestMetricsRoute:
         team_id = resp.json()["id"]
         resp = client.get(f"/teams/{team_id}/metrics")
         assert resp.status_code == 200
-        assert "total_tasks" in resp.json()
+        data = resp.json()
+        assert "tasks_completed" in data
+        assert "tasks_pending" in data
 
 
 class TestEventsRoutes:
