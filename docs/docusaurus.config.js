@@ -38,57 +38,9 @@ module.exports = {
       items: [
         {
           type: 'doc',
-          docId: 'concept/index',
+          docId: 'protocols/index',
           position: 'left',
-          label: 'Concept',
-        },
-        {
-          type: 'doc',
-          docId: 'getting-started/index',
-          position: 'left',
-          label: 'Getting Started',
-        },
-        {
-          type: 'doc',
-          docId: 'mcp-servers/index',
-          position: 'left',
-          label: 'MCP Servers',
-        },
-        {
-          type: 'doc',
-          docId: 'skills/index',
-          position: 'left',
-          label: 'Skills',
-        },
-        {
-          type: 'doc',
-          docId: 'programmatic-tools/index',
-          position: 'left',
-          label: 'Programmatic Tools',
-        },
-        {
-          type: 'doc',
-          docId: 'discovery/index',
-          position: 'left',
-          label: 'Tools Discovery',
-        },
-        {
-          type: 'doc',
-          docId: 'integrations/index',
-          position: 'left',
-          label: 'Integrations',
-        },
-        {
-          type: 'doc',
-          docId: 'mcp-server/index',
-          position: 'left',
-          label: 'MCP Server',
-        },
-        {
-          type: 'doc',
-          docId: 'examples/index',
-          position: 'left',
-          label: 'Examples',
+          label: 'Protocols',
         },
         {
           href: 'https://discord.gg/YQFwvmSSuR',

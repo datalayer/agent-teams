@@ -12,7 +12,7 @@ authors = [{ name = "Datalayer", email = "info@datalayer.io" }]
 dynamic = ["version"]
 readme = "README.md"
 requires-python = ">=3.10"
-keywords = ["Jupyter", "AI", "MCP", "Model Context Protocol"]
+keywords = ["Jupyter", "AI", "Agents", "Teams", "A2A", "Orchestration"]
 classifiers = [
   "Intended Audience :: Developers",
   "Intended Audience :: System Administrators",
@@ -21,11 +21,10 @@ classifiers = [
   "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "agent_skills",
-    "code_sandboxes",
-    "mcp[cli]>=1.0",
     "pydantic>=2.0",
+    "fastapi>=0.100",
     "httpx>=0.24",
+    "uvicorn[standard]>=0.20",
 ]
 
 [project.optional-dependencies]
@@ -33,7 +32,16 @@ pydantic-ai = [
     "pydantic-graph",
     "pydantic-ai-slim",
 ]
-test = ["ipykernel", "jupyter_server>=1.6,<3", "pytest>=7.0", "pytest-asyncio>=0.21"]
+a2a = [
+    "a2a-sdk>=0.2",
+]
+mcp = [
+    "mcp[cli]>=1.0",
+]
+all = [
+    "agent_teams[pydantic-ai,a2a,mcp]",
+]
+test = ["pytest>=7.0", "pytest-asyncio>=0.21", "httpx>=0.24"]
 lint = ["mdformat>0.7", "mdformat-gfm>=0.3.5", "ruff"]
 typing = ["mypy>=0.990"]
 

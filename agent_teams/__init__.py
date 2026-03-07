@@ -2,81 +2,177 @@
 #
 # BSD 3-Clause License
 
-"""Agent Teams
+"""Datalayer Agent Teams — orchestrate teams of AI agent runtimes.
+
+Public API
+----------
+
+Types & Models
+~~~~~~~~~~~~~~
+.. autosummary::
+    TeamConfig
+    TeamState
+    TeamStatus
+    AgentMemberConfig
+    AgentMemberState
+    TaskDefinition
+    TaskResult
+    TaskStatus
+    ExecutionMode
+    TeamEvent
+
+Protocol
+~~~~~~~~
+.. autosummary::
+    CoordinationMessage
+    TeamChannel
+    InMemoryChannel
+
+Orchestration
+~~~~~~~~~~~~~
+.. autosummary::
+    BaseOrchestrator
+    SupervisorOrchestrator
+    SequentialOrchestrator
+    ParallelOrchestrator
+
+Manager
+~~~~~~~
+.. autosummary::
+    TeamManager
+
+App
+~~~
+.. autosummary::
+    create_app
 """
 
-from .composition.executor import CodeModeExecutor
-from .discovery.codegen import PythonCodeGenerator
-from .discovery.registry import ToolRegistry
+from .__version__ import __version__
+
+# ---------------------------------------------------------------------------
+# Types & Models
+# ---------------------------------------------------------------------------
 from .types import (
-    CodeModeConfig,
-    MCPServerConfig,
-    SearchResult,
-    ServerInfo,
-    ToolCallResult,
-    ToolDefinition,
-    ToolParameter,
-)
-from .proxy.mcp_client import MCPClient
-from .proxy.meta_tools import MetaToolProvider
-
-# Import skills functionality from agent_skills
-from agent_skills import (
-    Skill,
-    SkillDirectory,
-    SkillFile,
-    SkillsManager,
-    SimpleSkill,
-    SimpleSkillsManager,
-    SimpleSkillManager,  # Alias for backward compatibility
-    SkillManager,  # Alias for backward compatibility
-    setup_skills_directory,
-    wait_for,
-    retry,
-    run_with_timeout,
-    parallel,
-    RateLimiter,
+    AgentMemberConfig,
+    AgentMemberState,
+    ApprovalPolicy,
+    Artifact,
+    AssignTaskRequest,
+    CreateTeamRequest,
+    EventType,
+    ExecutionMode,
+    MemberStatus,
+    NotificationConfig,
+    OrchestrationProtocol,
+    OutputConfig,
+    SupervisorConfig,
+    TaskDefinition,
+    TaskPriority,
+    TaskResult,
+    TaskStatus,
+    TeamConfig,
+    TeamEvent,
+    TeamMetrics,
+    TeamState,
+    TeamStatus,
+    TeamSummary,
+    UpdateTeamRequest,
+    ValidationConfig,
 )
 
-from .server import mcp as codemode_server, configure as configure_server
-from .toolset import CodemodeToolset, PYDANTIC_AI_AVAILABLE
+# ---------------------------------------------------------------------------
+# Protocol
+# ---------------------------------------------------------------------------
+from .protocol.channel import InMemoryChannel, TeamChannel
+from .protocol.messages import (
+    CoordinationMessage,
+    MemberHeartbeat,
+    MemberStatusUpdate,
+    MessageType,
+    TaskAssignment,
+    TaskDelegation,
+    TaskResultMessage,
+    TeamBroadcast,
+    TeamCommand,
+)
+
+# ---------------------------------------------------------------------------
+# State
+# ---------------------------------------------------------------------------
+from .state.artifact_store import ArtifactStore, InMemoryArtifactStore
+from .state.task_list import SharedTaskList
+
+# ---------------------------------------------------------------------------
+# Orchestration
+# ---------------------------------------------------------------------------
+from .orchestration.base import BaseOrchestrator, MemberProxy, OrchestratorContext
+from .orchestration.parallel import ParallelOrchestrator
+from .orchestration.sequential import SequentialOrchestrator
+from .orchestration.supervisor import SupervisorOrchestrator
+
+# ---------------------------------------------------------------------------
+# Manager
+# ---------------------------------------------------------------------------
+from .manager import TeamManager
+
+# ---------------------------------------------------------------------------
+# App factory
+# ---------------------------------------------------------------------------
+from .app import create_app
 
 __all__ = [
-    # Core components
-    "ToolRegistry",
-    "CodeModeExecutor",
-    "PythonCodeGenerator",
-    # Proxy
-    "MCPClient",
-    "MetaToolProvider",
-    # Skills (from agent_skills)
-    "Skill",
-    "SkillsManager",
-    "SimpleSkill",
-    "SimpleSkillsManager",
-    "SimpleSkillManager",  # Alias for backward compatibility
-    "SkillManager",  # Alias for backward compatibility
-    "SkillDirectory",
-    "SkillFile",
-    "setup_skills_directory",
-    # Helpers (from agent_skills)
-    "wait_for",
-    "retry",
-    "run_with_timeout",
-    "parallel",
-    "RateLimiter",
-    # MCP Server
-    "codemode_server",
-    "configure_server",
-    # Pydantic AI Toolset
-    "CodemodeToolset",
-    "PYDANTIC_AI_AVAILABLE",
-    # Models
-    "ToolDefinition",
-    "ToolParameter",
-    "ToolCallResult",
-    "MCPServerConfig",
-    "CodeModeConfig",
-    "SearchResult",
-    "ServerInfo",
+    "__version__",
+    # Types
+    "AgentMemberConfig",
+    "AgentMemberState",
+    "ApprovalPolicy",
+    "Artifact",
+    "AssignTaskRequest",
+    "CreateTeamRequest",
+    "EventType",
+    "ExecutionMode",
+    "MemberStatus",
+    "NotificationConfig",
+    "OrchestrationProtocol",
+    "OutputConfig",
+    "SupervisorConfig",
+    "TaskDefinition",
+    "TaskPriority",
+    "TaskResult",
+    "TaskStatus",
+    "TeamConfig",
+    "TeamEvent",
+    "TeamMetrics",
+    "TeamState",
+    "TeamStatus",
+    "TeamSummary",
+    "UpdateTeamRequest",
+    "ValidationConfig",
+    # Protocol
+    "CoordinationMessage",
+    "InMemoryChannel",
+    "MemberHeartbeat",
+    "MemberStatusUpdate",
+    "MessageType",
+    "TaskAssignment",
+    "TaskDelegation",
+    "TaskResultMessage",
+    "TeamBroadcast",
+    "TeamChannel",
+    "TeamCommand",
+    # State
+    "ArtifactStore",
+    "InMemoryArtifactStore",
+    "SharedTaskList",
+    # Orchestration
+    "BaseOrchestrator",
+    "MemberProxy",
+    "OrchestratorContext",
+    "ParallelOrchestrator",
+    "SequentialOrchestrator",
+    "SupervisorOrchestrator",
+    # Manager
+    "TeamManager",
+    # App
+    "create_app",
 ]
