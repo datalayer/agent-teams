@@ -60,6 +60,6 @@ deploy: build ## deploy
 		s3://datalayer-agent-teams/ \
 		--recursive && \
 	  aws cloudfront create-invalidation \
-		--distribution-id E364XTFIUUMV0I \
+		--distribution-id EF1X7HFFZFTLY \
 		--paths "/*" )
 	echo open ✨  https://agent-teams.datalayer.tech
