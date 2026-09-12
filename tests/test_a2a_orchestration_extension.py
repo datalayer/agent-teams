@@ -16,9 +16,17 @@ control-plane type on either side of the round trip.
 from __future__ import annotations
 
 from agent_teams.a2a.orchestration_extension import (
+    BUDGET_FIELD,
+    CHECKPOINT_FIELD,
+    CREDENTIAL_FIELD,
     ENVELOPE_KEY,
+    ERROR_FIELD,
+    EXECUTION_FIELD,
     ORCHESTRATION_EXTENSION_URI,
+    PAUSE_FIELD,
+    PAUSED_FIELD,
     STEER_METHOD,
+    USAGE_FIELD,
     Budget,
     ExecutionRef,
     Usage,

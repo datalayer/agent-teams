@@ -60,6 +60,14 @@ __all__ = [
     "ORCHESTRATION_EXTENSION_URI",
     "ENVELOPE_KEY",
     "STEER_METHOD",
+    "EXECUTION_FIELD",
+    "BUDGET_FIELD",
+    "CREDENTIAL_FIELD",
+    "CHECKPOINT_FIELD",
+    "PAUSE_FIELD",
+    "USAGE_FIELD",
+    "PAUSED_FIELD",
+    "ERROR_FIELD",
     "ExecutionRef",
     "Budget",
     "Usage",
@@ -92,14 +100,23 @@ ENVELOPE_KEY = "datalayer"
 #: not branch on protocol between this and ACP's `session/prompt` again.
 STEER_METHOD = "_datalayer/steer"
 
-_EXECUTION_FIELD = "execution"
-_BUDGET_FIELD = "budget"
-_CREDENTIAL_FIELD = "credential"
-_CHECKPOINT_FIELD = "checkpoint"
-_PAUSE_FIELD = "pause"
-_USAGE_FIELD = "usage"
-_PAUSED_FIELD = "paused"
-_ERROR_FIELD = "error"
+#: The field names inside the envelope, public so a caller that needs to
+#: read or write one directly — rather than through the functions below —
+#: is naming the same string this module does, not a private implementation
+#: detail it copied. This is what `agent_runtimes.context.delegation` and
+#: `agent_runtimes.guardrails.model_budget` import (ORCHESTRATOR.md, O3-02):
+#: those modules keep their own runtime-specific state (held credentials,
+#: the current run's `ContextVar`, pydantic-ai's `SteerCapability`), which
+#: has no equivalent here and does not belong in a protocol-only package,
+#: but the wire-level names are these, not a second declaration of them.
+EXECUTION_FIELD = "execution"
+BUDGET_FIELD = "budget"
+CREDENTIAL_FIELD = "credential"
+CHECKPOINT_FIELD = "checkpoint"
+PAUSE_FIELD = "pause"
+USAGE_FIELD = "usage"
+PAUSED_FIELD = "paused"
+ERROR_FIELD = "error"
 
 
 @dataclass(frozen=True)
@@ -345,7 +362,7 @@ def build_delegation_meta(
         A ``metadata`` fragment: ``{"datalayer": {...}}``.
     """
     envelope: dict[str, Any] = {
-        _EXECUTION_FIELD: {
+        EXECUTION_FIELD: {
             "executionId": execution.execution_id,
             "rootExecutionId": execution.root_execution_id,
             "depth": execution.depth,
@@ -358,13 +375,13 @@ def build_delegation_meta(
         }
     }
     if budget is not None:
-        envelope[_BUDGET_FIELD] = budget.to_wire() if isinstance(budget, Budget) else dict(budget)
+        envelope[BUDGET_FIELD] = budget.to_wire() if isinstance(budget, Budget) else dict(budget)
     if credential:
-        envelope[_CREDENTIAL_FIELD] = credential
+        envelope[CREDENTIAL_FIELD] = credential
     if checkpoint_id:
-        envelope[_CHECKPOINT_FIELD] = {"checkpointId": checkpoint_id}
+        envelope[CHECKPOINT_FIELD] = {"checkpointId": checkpoint_id}
     if pause:
-        envelope[_PAUSE_FIELD] = True
+        envelope[PAUSE_FIELD] = True
     return {ENVELOPE_KEY: envelope}
 
 
@@ -405,7 +422,7 @@ def read_delegation_meta(metadata: Any) -> _Delegation:
     if envelope is None:
         return _Delegation()
     execution_ref: ExecutionRef | None = None
-    raw_execution = envelope.get(_EXECUTION_FIELD)
+    raw_execution = envelope.get(EXECUTION_FIELD)
     if isinstance(raw_execution, Mapping) and raw_execution.get("executionId"):
         execution_ref = ExecutionRef(
             execution_id=str(raw_execution["executionId"]),
@@ -420,18 +437,18 @@ def read_delegation_meta(metadata: Any) -> _Delegation:
                 str(raw_execution["accountUid"]) if raw_execution.get("accountUid") else None
             ),
         )
-    raw_budget = envelope.get(_BUDGET_FIELD)
-    raw_checkpoint = envelope.get(_CHECKPOINT_FIELD)
+    raw_budget = envelope.get(BUDGET_FIELD)
+    raw_checkpoint = envelope.get(CHECKPOINT_FIELD)
     return _Delegation(
         execution=execution_ref,
         budget=dict(raw_budget) if isinstance(raw_budget, Mapping) else None,
-        credential=str(envelope[_CREDENTIAL_FIELD]) if envelope.get(_CREDENTIAL_FIELD) else None,
+        credential=str(envelope[CREDENTIAL_FIELD]) if envelope.get(CREDENTIAL_FIELD) else None,
         checkpoint_id=(
             str(raw_checkpoint["checkpointId"])
             if isinstance(raw_checkpoint, Mapping) and raw_checkpoint.get("checkpointId")
             else None
         ),
-        pause_requested=bool(envelope.get(_PAUSE_FIELD)),
+        pause_requested=bool(envelope.get(PAUSE_FIELD)),
     )
 
 
@@ -464,7 +481,7 @@ def usage_meta(
     usage = Usage(
         input_tokens=input_tokens, output_tokens=output_tokens, cost=cost, currency=currency
     )
-    return {ENVELOPE_KEY: {_USAGE_FIELD: usage.to_wire()}}
+    return {ENVELOPE_KEY: {USAGE_FIELD: usage.to_wire()}}
 
 
 def paused_meta(checkpoint_id: str) -> dict[str, Any]:
@@ -482,7 +499,7 @@ def paused_meta(checkpoint_id: str) -> dict[str, Any]:
     dict[str, Any]
         A ``metadata`` fragment naming the checkpoint.
     """
-    return {ENVELOPE_KEY: {_PAUSED_FIELD: {"checkpointId": checkpoint_id}}}
+    return {ENVELOPE_KEY: {PAUSED_FIELD: {"checkpointId": checkpoint_id}}}
 
 
 def error_meta(*, code: str, limit: str | None = None) -> dict[str, Any]:
@@ -508,7 +525,7 @@ def error_meta(*, code: str, limit: str | None = None) -> dict[str, Any]:
     error: dict[str, Any] = {"code": code}
     if limit:
         error["limit"] = limit
-    return {ENVELOPE_KEY: {_ERROR_FIELD: error}}
+    return {ENVELOPE_KEY: {ERROR_FIELD: error}}
 
 
 def read_usage_meta(metadata: Any) -> Usage | None:
@@ -528,7 +545,7 @@ def read_usage_meta(metadata: Any) -> Usage | None:
     envelope = _ours(metadata)
     if envelope is None:
         return None
-    raw = envelope.get(_USAGE_FIELD)
+    raw = envelope.get(USAGE_FIELD)
     if not isinstance(raw, Mapping):
         return None
     return Usage(
