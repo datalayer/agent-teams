@@ -54,6 +54,23 @@ class TestConstants:
     def test_the_steer_method(self):
         assert STEER_METHOD == "_datalayer/steer"
 
+    def test_the_field_names_are_public(self):
+        # Public so a consumer that keeps its own runtime-specific state
+        # around a delegation — `agent_runtimes.context.delegation` holds
+        # credentials and a current-run ContextVar this package has no
+        # equivalent for — imports these rather than re-declaring them
+        # (ORCHESTRATOR.md O3-02). A rename here must be a deliberate,
+        # visible edit to this test, not a silent drift between two
+        # hand-maintained copies of the same six strings.
+        assert EXECUTION_FIELD == "execution"
+        assert BUDGET_FIELD == "budget"
+        assert CREDENTIAL_FIELD == "credential"
+        assert CHECKPOINT_FIELD == "checkpoint"
+        assert PAUSE_FIELD == "pause"
+        assert USAGE_FIELD == "usage"
+        assert PAUSED_FIELD == "paused"
+        assert ERROR_FIELD == "error"
+
 
 class TestBuildDelegationMeta:
     def test_the_execution_is_always_present(self):
