@@ -68,6 +68,21 @@ from .orchestration_extension import (
     usage_meta,
 )
 
+# `orchestration_extension` above has no framework dependency at all — the
+# whole point of O3-02 — but everything below this line is built on
+# `fasta2a`, which is this package's optional `a2a` extra, not a core
+# dependency: `agent_runtimes` (and anyone else) depends on `agent-teams`
+# unconditionally but only pulls `fasta2a` in through its own `a2a` extra,
+# so `import agent_teams.a2a.orchestration_extension` — which Python cannot
+# do without first running this file — must not fail for an install that
+# has the former and not the latter.
+try:
+    from .reference_worker import ReferenceWorker, create_reference_app
+
+    _REFERENCE_WORKER_EXPORTS = ["ReferenceWorker", "create_reference_app"]
+except ImportError:
+    _REFERENCE_WORKER_EXPORTS = []
+
 # `application`, `channel`, `storage` and `worker` build A2A `Message`/`Part`
 # payloads against an older fasta2a shape — `TextPart(kind="text", ...)`,
 # `part.get("kind")` — that the installed `fasta2a` no longer has: `Part` is
@@ -127,5 +142,6 @@ __all__ = [
     "read_usage_meta",
     "steer_notification",
     "usage_meta",
+    *_REFERENCE_WORKER_EXPORTS,
     *_LEGACY_EXPORTS,
 ]

@@ -120,4 +120,10 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 # S101 Use of `assert` detected
-"agent_teams/tests/*" = ["S101"]
+#
+# This glob matched nothing: the suite is `tests/`, at the repository root,
+# not `agent_teams/tests/` — so every test file has been flagged for
+# `assert` since this was written. Fixed, not just for the new conformance
+# suite: `ruff check tests/test_a2a_orchestration_extension.py` alone went
+# from 58 false positives to zero.
+"tests/*" = ["S101"]

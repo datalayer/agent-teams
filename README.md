@@ -57,3 +57,25 @@ This is distinct from `agent_teams.a2a.extensions`' own
 — member assignment, task dependencies, health and reactions for a team's
 *own* internal coordination. The two extensions are independent and
 separately negotiated; a card may advertise either, both, or neither.
+
+### A reference worker, and a public conformance suite
+
+`agent_teams.a2a.reference_worker` is the smallest thing that speaks the
+extension correctly: no model, no framework beyond `fasta2a`, no Datalayer
+control plane. Run it standalone —
+
+```bash
+python -m agent_teams.a2a.reference_worker  # serves on :8000
+```
+
+— point any A2A client at it, and its card advertises the extension. It
+answers a turn with what it "spent" (a character count, not a model call,
+so this needs no API key), declines a delegation whose budget already
+reads `outputTokens: 0` naming the limit, and answers a `pause` request by
+ending the turn at a checkpoint it makes up on the spot.
+
+`tests/test_reference_worker_conformance.py` drives it over real ASGI HTTP
+(`httpx.ASGITransport`, no socket) with hand-built JSON-RPC requests
+matching `docs/extension-v1.md`'s documented wire shapes — negotiation, a
+declined budget, pause and resume — runnable by anyone against their own
+worker, with no Datalayer service in the loop.
