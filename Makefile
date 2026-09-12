@@ -30,6 +30,22 @@ build:
 clean: ## clean
 	git clean -fdx
 
+clean-npm: ## clean-npm
+	npm run clean
+
+build-npm: ## build-npm
+	npm run build
+
+build-lib: ## build-lib
+	npm run build:lib
+
+warning:
+	echo "\x1b[34m\x1b[43mEnsure you have run \x1b[1;37m\x1b[41m conda deactivate \x1b[22m\x1b[34m\x1b[43m before invoking this.\x1b[0m"
+
+publish-npm: clean-npm build-lib ## publish-npm
+	npm publish
+	echo open https://www.npmjs.com/package/@datalayer/agent-teams --public
+
 test: ## Run tests
 	python -m pytest tests/ -v
 

@@ -24,7 +24,9 @@
   "files": ["lib"],
   "sideEffects": false,
   "scripts": {
+    "clean:lib": "rimraf lib tsconfig.tsbuildinfo",
     "build": "npm run clean && tsc -b",
+    "build:lib": "npm run clean:lib && tsc -b",
     "clean": "rimraf lib tsconfig.tsbuildinfo",
     "watch": "tsc -b -w",
     "test": "node --test lib/__tests__/**/*.test.js",
