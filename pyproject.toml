@@ -50,7 +50,27 @@ mcp = [
 all = [
     "agent_teams[pydantic-ai,a2a,mcp]",
 ]
-test = ["pytest>=7.0", "pytest-asyncio>=0.21", "httpx>=0.24", "fasta2a", "anyio"]
+test = [
+  "pytest>=7.0",
+  "pytest-asyncio>=0.21",
+  "httpx>=0.24",
+  # Unpinned floor fixed alongside the a2a-sdk pin below: `fasta2a` with no
+  # ceiling is exactly the drift that renamed `A2AClient`'s `base_url`
+  # argument to `agent` mid-air and broke every A2A dispatch in this
+  # package silently (found and fixed in the a2a extra, ORCHESTRATOR.md
+  # O3-02) — the same risk was still sitting here, unpinned, in the test
+  # dependency that installs the same package.
+  "fasta2a>=2.0.0,<2.1",
+  "anyio",
+  # The A2A project's own reference implementation (a2a-protocol.org),
+  # independent of `fasta2a` — which Datalayer contributes to — used only
+  # to drive `tests/test_standard_client_compatibility.py`
+  # (ORCHESTRATOR.md O3-05): a standard client against this package's
+  # worker, and a standard, non-Datalayer worker against this package's
+  # own dispatch pattern. Pinned, not floored: "against a pinned
+  # third-party implementation" is this item's own done-when.
+  "a2a-sdk[all]==0.3.26",
+]
 lint = ["mdformat>0.7", "mdformat-gfm>=0.3.5", "ruff"]
 typing = ["mypy>=0.990"]
 
