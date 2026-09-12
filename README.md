@@ -11,10 +11,12 @@
 # 🤖 👥 Agent Teams
 
 [![PyPI - Version](https://img.shields.io/pypi/v/agent-teams)](https://pypi.org/project/agent-teams)
+[![npm](https://img.shields.io/npm/v/%40datalayer%2Fagent-teams)](https://www.npmjs.com/package/@datalayer/agent-teams)
 
 ## The Datalayer orchestration extension
 
-`agent_teams.a2a` implements the [Datalayer orchestration
+`agent_teams.a2a` (Python) and `@datalayer/agent-teams` (TypeScript)
+implement the [Datalayer orchestration
 extension](https://datalayer.ai/extensions/orchestration/v1) — an optional
 A2A extension that lets a worker and an orchestrator say the things about
 *delegated work* that A2A leaves unsaid: which execution a delegation is
@@ -31,12 +33,24 @@ meta = build_delegation_meta(
 )
 ```
 
+```typescript
+import { buildDelegationMeta } from '@datalayer/agent-teams';
+
+const meta = buildDelegationMeta(
+  { executionId: 'exec_1', rootExecutionId: 'exec_1', depth: 0 },
+  { budget: { outputTokens: 4000 } },
+);
+```
+
 Nothing here requires the rest of this package, and nothing here imports
-Datalayer's own platform — `agent_teams.a2a.orchestration_extension` is a
-standalone module built on `fasta2a` alone. A worker implementing none of
-it still runs; see the normative specification and its JSON Schema at
+Datalayer's own platform — `agent_teams.a2a.orchestration_extension` and
+`@datalayer/agent-teams`'s `src/orchestrationExtension.ts` are each a
+standalone module (Python built on `fasta2a` alone; TypeScript with zero
+runtime dependencies at all) implementing the identical wire shape, field
+for field. A worker implementing none of it still runs; see the normative
+specification and its JSON Schema at
 [`docs/extension-v1.md`](https://github.com/datalayer-research/context-orchestration-protocols/blob/main/docs/extension-v1.md)
-for the full field-by-field contract this module implements.
+for the full field-by-field contract both modules implement.
 
 This is distinct from `agent_teams.a2a.extensions`' own
 **team-coordination** extension (`https://datalayer.io/ext/team-coordination/v1`)

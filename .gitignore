@@ -1,6 +1,11 @@
 *.egg-info/
 .ipynb_checkpoints
 
+# Node / TypeScript (the @datalayer/agent-teams package)
+node_modules/
+*.tsbuildinfo
+package-lock.json
+
 # Created by https://www.gitignore.io/api/python
 # Edit at https://www.gitignore.io/?templates=python
 
