@@ -22,9 +22,17 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  BUDGET_FIELD,
+  CHECKPOINT_FIELD,
+  CREDENTIAL_FIELD,
   ENVELOPE_KEY,
+  ERROR_FIELD,
+  EXECUTION_FIELD,
   ORCHESTRATION_EXTENSION_URI,
+  PAUSE_FIELD,
+  PAUSED_FIELD,
   STEER_METHOD,
+  USAGE_FIELD,
   agentExtension,
   buildDelegationMeta,
   errorMeta,
@@ -49,6 +57,20 @@ describe('constants', () => {
 
   test('the steer method', () => {
     assert.equal(STEER_METHOD, '_datalayer/steer');
+  });
+
+  test('the field names are public, and match the Python package', () => {
+    // Exported so a consumer with its own runtime-specific state around a
+    // delegation imports these rather than re-declaring them
+    // (ORCHESTRATOR.md O3-02, O3-03).
+    assert.equal(EXECUTION_FIELD, 'execution');
+    assert.equal(BUDGET_FIELD, 'budget');
+    assert.equal(CREDENTIAL_FIELD, 'credential');
+    assert.equal(CHECKPOINT_FIELD, 'checkpoint');
+    assert.equal(PAUSE_FIELD, 'pause');
+    assert.equal(USAGE_FIELD, 'usage');
+    assert.equal(PAUSED_FIELD, 'paused');
+    assert.equal(ERROR_FIELD, 'error');
   });
 });
 
