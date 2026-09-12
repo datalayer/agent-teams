@@ -38,7 +38,7 @@ from typing import Any
 
 from fasta2a import FastA2A, Skill
 from fasta2a.broker import InMemoryBroker
-from fasta2a.storage import InMemoryStorage, StreamingStorageWrapper
+from fasta2a.storage import InMemoryStorage
 
 from ..manager import TeamManager
 from ..types import TeamConfig
@@ -62,7 +62,7 @@ class A2ATeamApp:
     worker:
         The ``TeamMemberWorker`` that executes tasks.
     storage:
-        The ``TeamTaskStorage`` or ``StreamingStorageWrapper``.
+        The ``TeamTaskStorage`` or plain ``InMemoryStorage``.
     broker:
         The fasta2a ``InMemoryBroker``.
     """
@@ -96,11 +96,13 @@ class A2ATeamApp:
             # Team not yet started — use plain in-memory storage
             base_storage = InMemoryStorage()
 
-        # Wrap with streaming support if enabled
-        if enable_streaming:
-            self.storage = StreamingStorageWrapper(base_storage, self.broker)
-        else:
-            self.storage = base_storage
+        # `StreamingStorageWrapper` no longer exists in fasta2a: current
+        # `FastA2A` handles `message/stream` natively, through its own
+        # `TaskManager`, on whatever storage it is given — a wrapper class
+        # was never needed for streaming to work. `enable_streaming` is kept
+        # for API compatibility; it no longer changes what storage is built.
+        del enable_streaming
+        self.storage = base_storage
 
         # Create worker with current team members
         members = ctx.members if ctx else {}

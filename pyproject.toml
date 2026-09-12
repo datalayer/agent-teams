@@ -33,11 +33,16 @@ agent-teams = "agent_teams.cli:main"
 
 [project.optional-dependencies]
 pydantic-ai = [
-    "pydantic-graph",
-    "pydantic-ai-slim",
+  "pydantic-graph>=1.94.0",
+  "pydantic-ai-slim>=1.94.0",
 ]
 a2a = [
-    "fasta2a",
+    # No floor and no ceiling left every install resolve to whatever was
+    # newest on PyPI, and somewhere within 2.0.x `A2AClient.__init__`
+    # renamed its worker-URL argument from `base_url` to `agent` — every
+    # remote member in this package was unreachable until it was found.
+    # `<2.1` matches the `agent=` constructor the code is fixed against.
+    "fasta2a>=2.0.0,<2.1",
 ]
 mcp = [
     "mcp[cli]>=1.0",

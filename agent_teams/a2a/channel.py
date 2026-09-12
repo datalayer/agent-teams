@@ -65,7 +65,12 @@ class A2AChannel(TeamChannel):
         """
         if base_url:
             self._members[member_id] = base_url
-            self._clients[member_id] = A2AClient(base_url=base_url)
+            # `agent`, not `base_url` — fasta2a renamed the constructor's
+            # worker-URL argument somewhere within the unpinned `fasta2a`
+            # floor this package had; every remote member was unreachable
+            # until it was found and fixed (datalayer/orchestrator-protocols
+            # research, ORCHESTRATOR.md O3-02).
+            self._clients[member_id] = A2AClient(agent=base_url)
         self._inboxes[member_id] = asyncio.Queue(maxsize=1000)
         logger.debug("A2AChannel: registered member %s (url=%s)", member_id, base_url)
 

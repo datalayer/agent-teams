@@ -699,7 +699,8 @@ class TeamManager:
 
             import uuid
 
-            client = A2AClient(base_url=endpoint)
+            # `agent`, not `base_url` — see the note in a2a/channel.py.
+            client = A2AClient(agent=endpoint)
             try:
                 message = A2AMessage(
                     role="user",

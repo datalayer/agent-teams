@@ -139,14 +139,8 @@ from .app import create_app
 # ---------------------------------------------------------------------------
 try:
     from .a2a import (
-        A2AChannel,
-        A2ATeamApp,
-        CompositeChannel,
         TEAM_COORDINATION_URI,
-        TeamMemberWorker,
-        TeamTaskStorage,
         agent_extension,
-        create_a2a_team_app,
         extract_team_metadata,
         is_team_extension_active,
         make_health_metadata,
@@ -155,14 +149,8 @@ try:
     )
 
     _A2A_EXPORTS = [
-        "A2AChannel",
-        "A2ATeamApp",
-        "CompositeChannel",
         "TEAM_COORDINATION_URI",
-        "TeamMemberWorker",
-        "TeamTaskStorage",
         "agent_extension",
-        "create_a2a_team_app",
         "extract_team_metadata",
         "is_team_extension_active",
         "make_health_metadata",
@@ -171,6 +159,62 @@ try:
     ]
 except ImportError:
     _A2A_EXPORTS = []
+
+# The orchestration extension (ORCHESTRATOR.md O3-01, O3-02) has no legacy
+# `fasta2a` message-shape dependency, so it is imported unconditionally
+# rather than folded into the guarded block above — a drift in `application`,
+# `channel`, `storage` or `worker` must never take this down with it.
+from .a2a import (
+    ORCHESTRATION_EXTENSION_URI,
+    STEER_METHOD,
+    Budget,
+    ExecutionRef,
+    Usage,
+    build_delegation_meta,
+    error_meta,
+    extension_agent_extension,
+    is_extension_active,
+    paused_meta,
+    read_delegation_meta,
+    read_usage_meta,
+    steer_notification,
+    usage_meta,
+)
+
+_ORCHESTRATION_EXTENSION_EXPORTS = [
+    "ORCHESTRATION_EXTENSION_URI",
+    "STEER_METHOD",
+    "Budget",
+    "ExecutionRef",
+    "Usage",
+    "build_delegation_meta",
+    "error_meta",
+    "extension_agent_extension",
+    "is_extension_active",
+    "paused_meta",
+    "read_delegation_meta",
+    "read_usage_meta",
+    "steer_notification",
+    "usage_meta",
+]
+
+# The legacy A2A team app — the one part of the `a2a` subpackage still
+# blocked on the message-shape drift `a2a/__init__.py` documents. Guarded on
+# its own so the two unrelated failure modes are never conflated.
+try:
+    from .a2a import A2AChannel, A2ATeamApp, CompositeChannel, TeamMemberWorker, TeamTaskStorage
+    from .a2a import create_a2a_team_app
+
+    _A2A_APP_EXPORTS = [
+        "A2AChannel",
+        "A2ATeamApp",
+        "CompositeChannel",
+        "TeamMemberWorker",
+        "TeamTaskStorage",
+        "create_a2a_team_app",
+    ]
+except ImportError:
+    _A2A_APP_EXPORTS = []
 
 __all__ = [
     "__version__",
@@ -242,6 +286,10 @@ __all__ = [
     "TeamManager",
     # App
     "create_app",
-    # A2A (conditional)
+    # A2A: team-coordination extension (conditional on fasta2a)
     *_A2A_EXPORTS,
+    # A2A: the orchestration extension (unconditional; no legacy dependency)
+    *_ORCHESTRATION_EXTENSION_EXPORTS,
+    # A2A: the legacy team app (conditional on fasta2a's current message shape)
+    *_A2A_APP_EXPORTS,
 ]
