@@ -56,14 +56,21 @@ export const ENVELOPE_KEY = 'datalayer';
 /** The one method the extension adds: instructions delivered to a turn already in progress. A2A has no way to add instructions to a running task; ACP can prompt the same session again, so this asymmetry is A2A's alone. */
 export const STEER_METHOD = '_datalayer/steer';
 
-const EXECUTION_FIELD = 'execution';
-const BUDGET_FIELD = 'budget';
-const CREDENTIAL_FIELD = 'credential';
-const CHECKPOINT_FIELD = 'checkpoint';
-const PAUSE_FIELD = 'pause';
-const USAGE_FIELD = 'usage';
-const PAUSED_FIELD = 'paused';
-const ERROR_FIELD = 'error';
+/**
+ * The field names inside the envelope, exported so a caller that needs to
+ * read or write one directly — rather than through the functions below —
+ * is naming the same string this module does, not a private implementation
+ * detail it copied. Mirrors the Python package's identically-named,
+ * identically-public constants (ORCHESTRATOR.md O3-02, O3-03).
+ */
+export const EXECUTION_FIELD = 'execution';
+export const BUDGET_FIELD = 'budget';
+export const CREDENTIAL_FIELD = 'credential';
+export const CHECKPOINT_FIELD = 'checkpoint';
+export const PAUSE_FIELD = 'pause';
+export const USAGE_FIELD = 'usage';
+export const PAUSED_FIELD = 'paused';
+export const ERROR_FIELD = 'error';
 
 /**
  * Which execution a delegation is part of, and where it sits in its tree.
