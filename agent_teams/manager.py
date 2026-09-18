@@ -64,7 +64,7 @@ _FASTA2A_AVAILABLE = False
 try:
     from fasta2a import FastA2A
     from fasta2a.broker import InMemoryBroker
-    from fasta2a.storage import InMemoryStorage, StreamingStorageWrapper
+    from fasta2a.storage import InMemoryStorage
 
     _FASTA2A_AVAILABLE = True
 except ImportError:
@@ -671,8 +671,11 @@ class TeamManager:
             return
 
         broker = InMemoryBroker()
-        base_storage = InMemoryStorage()
-        storage = StreamingStorageWrapper(base_storage, broker)
+        # fasta2a streams `message/stream` natively on whatever storage it is given
+        # (`StreamingStorageWrapper` is gone — see `a2a/application.py`). Importing the
+        # wrapper was what made `_FASTA2A_AVAILABLE` false on every current fasta2a,
+        # quietly switching the manager's A2A features off.
+        storage = InMemoryStorage()
 
         self._a2a_brokers[team_id] = broker
         self._a2a_storages[team_id] = storage
@@ -695,7 +698,7 @@ class TeamManager:
                 raise RuntimeError("fasta2a not installed — cannot call remote A2A agents")
 
             from fasta2a.client import A2AClient
-            from fasta2a.schema import Message as A2AMessage, TextPart
+            from fasta2a.schema import Message as A2AMessage, Part
 
             import uuid
 
@@ -704,9 +707,8 @@ class TeamManager:
             try:
                 message = A2AMessage(
                     role="user",
-                    kind="message",
                     message_id=str(uuid.uuid4()),
-                    parts=[TextPart(kind="text", text=prompt)],
+                    parts=[Part(text=prompt)],
                     metadata=context or {},
                 )
                 response = await client.send_message(message)
@@ -719,13 +721,12 @@ class TeamManager:
                         f"A2A error from {endpoint}: {error.get('message', 'Unknown error')}"
                     )
 
-                # If result is a Task, extract text from history or artifacts
-                if isinstance(result, dict) and result.get("kind") == "task":
-                    return _extract_text_from_a2a_task(result)
-
-                # If result is a Message, extract text from parts
-                if isinstance(result, dict) and result.get("kind") == "message":
-                    return _extract_text_from_parts(result.get("parts", []))
+                # A2A v1: the result names what it is — `{"task": …}` or `{"message": …}` —
+                # where it used to carry a `kind`.
+                if isinstance(result, dict) and isinstance(result.get("task"), dict):
+                    return _extract_text_from_a2a_task(result["task"])
+                if isinstance(result, dict) and isinstance(result.get("message"), dict):
+                    return _extract_text_from_parts(result["message"].get("parts", []))
 
                 return str(result)
             finally:
@@ -755,7 +756,7 @@ def _extract_text_from_a2a_task(task: dict[str, Any]) -> str:
         texts = []
         for art in artifacts:
             for part in art.get("parts", []):
-                if part.get("kind") == "text":
+                if "text" in part:
                     texts.append(part.get("text", ""))
         if texts:
             return "\n".join(texts)
@@ -773,6 +774,6 @@ def _extract_text_from_parts(parts: list[dict[str, Any]]) -> str:
     """Extract text from A2A message parts."""
     texts = []
     for part in parts:
-        if part.get("kind") == "text":
+        if "text" in part:
             texts.append(part.get("text", ""))
     return "\n".join(texts)

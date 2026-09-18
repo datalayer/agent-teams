@@ -49,7 +49,8 @@ class TestCoordinationToA2A:
         a2a_msg = _coordination_to_a2a_message(msg)
 
         assert a2a_msg["role"] == "user"
-        assert a2a_msg["kind"] == "message"
+        # A2A v1: a message carries no `kind` discriminator.
+        assert "kind" not in a2a_msg
         assert a2a_msg["message_id"] == msg.id
         assert len(a2a_msg["parts"]) == 1
         assert "[task/assign]" in a2a_msg["parts"][0]["text"]

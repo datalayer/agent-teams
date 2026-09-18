@@ -25,7 +25,7 @@ from fasta2a.schema import (
     Task as A2ATask,
     TaskState as A2ATaskState,
     TaskStatus as A2ATaskStatus,
-    TextPart,
+    Part,
 )
 from fasta2a.storage import Storage
 
@@ -95,9 +95,8 @@ def task_to_a2a(task: TaskDefinition, team_id: str) -> A2ATask:
     history: list[A2AMessage] = []
     msg = A2AMessage(
         role="user",
-        kind="message",
         message_id=str(uuid.uuid4()),
-        parts=[TextPart(kind="text", text=f"{task.title}\n\n{task.description}")],
+        parts=[Part(text=f"{task.title}\n\n{task.description}")],
     )
     history.append(msg)
 
@@ -111,7 +110,6 @@ def task_to_a2a(task: TaskDefinition, team_id: str) -> A2ATask:
     result: A2ATask = {
         "id": task.id,
         "context_id": team_id,
-        "kind": "task",
         "status": a2a_status,
         "history": history,
     }
@@ -124,7 +122,7 @@ def _artifact_to_a2a(art: Artifact) -> A2AArtifact:
     """Convert an agent-teams ``Artifact`` to an A2A ``Artifact``."""
     parts: list[Any] = []
     if art.content is not None:
-        parts.append(TextPart(kind="text", text=str(art.content)))
+        parts.append(Part(text=str(art.content)))
     return A2AArtifact(
         artifact_id=art.id,
         name=art.name,
@@ -137,7 +135,7 @@ def a2a_artifact_to_team(a2a_art: A2AArtifact) -> Artifact:
     """Convert an A2A ``Artifact`` to an agent-teams ``Artifact``."""
     content = None
     for part in a2a_art.get("parts", []):
-        if part.get("kind") == "text":
+        if "text" in part:
             content = part.get("text", "")
             break
 
@@ -199,7 +197,7 @@ class TeamTaskStorage(Storage[dict[str, Any]]):
         # Extract text from message parts
         text_parts: list[str] = []
         for part in message.get("parts", []):
-            if part.get("kind") == "text":
+            if "text" in part:
                 text_parts.append(part.get("text", ""))
         full_text = "\n".join(text_parts)
 
@@ -284,6 +282,6 @@ def _extract_text_from_messages(messages: list[A2AMessage]) -> str:
     texts: list[str] = []
     for msg in messages:
         for part in msg.get("parts", []):
-            if part.get("kind") == "text":
+            if "text" in part:
                 texts.append(part.get("text", ""))
     return "\n".join(texts)

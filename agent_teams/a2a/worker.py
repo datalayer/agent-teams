@@ -24,7 +24,7 @@ from fasta2a.schema import (
     Message as A2AMessage,
     TaskIdParams,
     TaskSendParams,
-    TextPart,
+    Part,
 )
 from fasta2a.worker import Worker
 
@@ -122,9 +122,8 @@ class TeamMemberWorker(Worker[dict[str, Any]]):
             # Build result message
             result_message = A2AMessage(
                 role="agent",
-                kind="message",
                 message_id=f"{task_id}-result",
-                parts=[TextPart(kind="text", text=result_text)],
+                parts=[Part(text=result_text)],
                 task_id=task_id,
                 context_id=context_id,
                 metadata={
@@ -160,9 +159,8 @@ class TeamMemberWorker(Worker[dict[str, Any]]):
 
             error_message = A2AMessage(
                 role="agent",
-                kind="message",
                 message_id=f"{task_id}-error",
-                parts=[TextPart(kind="text", text=f"Error: {exc}")],
+                parts=[Part(text=f"Error: {exc}")],
                 task_id=task_id,
                 context_id=context_id,
                 metadata={"member_id": member.id, "error": str(exc)},
@@ -187,7 +185,7 @@ class TeamMemberWorker(Worker[dict[str, Any]]):
             role = msg.get("role", "user")
             text_parts = []
             for part in msg.get("parts", []):
-                if part.get("kind") == "text":
+                if "text" in part:
                     text_parts.append(part.get("text", ""))
             if text_parts:
                 result.append({"role": role, "content": "\n".join(text_parts)})
@@ -204,7 +202,7 @@ class TeamMemberWorker(Worker[dict[str, Any]]):
                 A2AArtifact(
                     artifact_id=f"art-{id(result):x}",
                     name="result",
-                    parts=[TextPart(kind="text", text=result)],
+                    parts=[Part(text=result)],
                 )
             ]
 
@@ -219,6 +217,6 @@ class TeamMemberWorker(Worker[dict[str, Any]]):
         """Extract text content from an A2A message."""
         parts = []
         for part in message.get("parts", []):
-            if part.get("kind") == "text":
+            if "text" in part:
                 parts.append(part.get("text", ""))
         return "\n".join(parts) if parts else ""

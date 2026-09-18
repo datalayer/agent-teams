@@ -83,16 +83,15 @@ try:
 except ImportError:
     _REFERENCE_WORKER_EXPORTS = []
 
-# `application`, `channel`, `storage` and `worker` build A2A `Message`/`Part`
-# payloads against an older fasta2a shape — `TextPart(kind="text", ...)`,
-# `part.get("kind")` — that the installed `fasta2a` no longer has: `Part` is
-# now a flat `{text, raw, url, data}` dict with no `kind` discriminator at
-# all, on top of the `StreamingStorageWrapper` and `A2AClient(base_url=...)`
-# drift already found and fixed here. Wrapped the same way the top-level
-# `agent_teams/__init__.py` already wraps this whole subpackage, so that one
-# genuinely broken corner does not take the orchestration extension above
-# down with it. Fixing the message-shape drift itself is a separate,
-# larger pass across four files this change does not attempt.
+# `application`, `channel`, `storage` and `worker` are built on the A2A v1
+# shapes fasta2a 2.x has: a `Part` is a flat `{text, raw, url, data}` dict with
+# no `kind`, messages and tasks carry no `kind` either, and a `message/send`
+# result is `{"task": …}` or `{"message": …}`. They used the pre-v1 shapes
+# (`TextPart(kind="text", …)`, `part.get("kind")`) until 2026-09-18, so this
+# import failed on every fasta2a the package allows and these four classes were
+# never exported — nothing said so but the wrapper below. Still wrapped: fasta2a
+# is the optional `a2a` extra, and a broken corner here must not take the
+# orchestration extension above down with it.
 try:
     from .application import A2ATeamApp, create_a2a_team_app
     from .channel import A2AChannel, CompositeChannel

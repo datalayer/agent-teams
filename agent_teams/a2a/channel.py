@@ -21,7 +21,7 @@ import uuid
 from typing import Any, AsyncIterator
 
 from fasta2a.client import A2AClient
-from fasta2a.schema import Message as A2AMessage, TextPart
+from fasta2a.schema import Message as A2AMessage, Part
 
 from ..protocol.channel import TeamChannel
 from ..protocol.messages import CoordinationMessage
@@ -268,9 +268,8 @@ def _coordination_to_a2a_message(msg: CoordinationMessage) -> A2AMessage:
     text = f"[{msg.type.value}] {msg.payload}" if msg.payload else f"[{msg.type.value}]"
     return A2AMessage(
         role="user",
-        kind="message",
         message_id=msg.id,
-        parts=[TextPart(kind="text", text=text)],
+        parts=[Part(text=text)],
         metadata={
             "team_id": msg.team_id,
             "sender": msg.sender,

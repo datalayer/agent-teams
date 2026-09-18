@@ -128,7 +128,6 @@ class A2ATeamApp:
             version="0.1.0",
             skills=skills,
             extensions=[team_ext],
-            streaming=enable_streaming,
         )
 
     def update_members(self, members: dict[str, Any]) -> None:

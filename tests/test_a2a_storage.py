@@ -27,7 +27,7 @@ from agent_teams.types import (
 from fasta2a.schema import (
     Artifact as A2AArtifact,
     Message as A2AMessage,
-    TextPart,
+    Part,
 )
 
 
@@ -102,7 +102,8 @@ class TestConversionHelpers:
 
         assert a2a_task["id"] == task.id
         assert a2a_task["context_id"] == "team-1"
-        assert a2a_task["kind"] == "task"
+        # A2A v1: a task carries no `kind` discriminator.
+        assert "kind" not in a2a_task
         assert a2a_task["status"]["state"] == "submitted"
         assert len(a2a_task["history"]) == 1
         assert a2a_task["history"][0]["parts"][0]["text"] == "Test task\n\nSome work"
@@ -137,7 +138,7 @@ class TestConversionHelpers:
         a2a_art = A2AArtifact(
             artifact_id="art-1",
             name="code output",
-            parts=[TextPart(kind="text", text="print('hello')")],
+            parts=[Part(text="print('hello')")],
             metadata={"content_type": "text/python"},
         )
         team_art = a2a_artifact_to_team(a2a_art)
@@ -160,7 +161,7 @@ class TestConversionHelpers:
         a2a_art = A2AArtifact(
             artifact_id="art-3",
             name="plain",
-            parts=[TextPart(kind="text", text="stuff")],
+            parts=[Part(text="stuff")],
         )
         team_art = a2a_artifact_to_team(a2a_art)
         assert team_art.content_type == "text/plain"
@@ -198,14 +199,13 @@ class TestTeamTaskStorage:
     async def test_submit_and_load_task(self, storage: TeamTaskStorage) -> None:
         msg = A2AMessage(
             role="user",
-            kind="message",
             message_id="msg-1",
-            parts=[TextPart(kind="text", text="Analyse the data\nWith graphs")],
+            parts=[Part(text="Analyse the data\nWith graphs")],
         )
 
         task = await storage.submit_task("ctx-1", msg)
 
-        assert task["kind"] == "task"
+        assert "kind" not in task
         assert task["context_id"] == "team-test"
         assert task["status"]["state"] == "submitted"
 
@@ -226,9 +226,8 @@ class TestTeamTaskStorage:
     ) -> None:
         msg = A2AMessage(
             role="user",
-            kind="message",
             message_id="msg-2",
-            parts=[TextPart(kind="text", text="Do something")],
+            parts=[Part(text="Do something")],
         )
         task = await storage.submit_task("ctx-2", msg)
 
@@ -247,17 +246,15 @@ class TestTeamTaskStorage:
     ) -> None:
         msg = A2AMessage(
             role="user",
-            kind="message",
             message_id="msg-3",
-            parts=[TextPart(kind="text", text="Task text")],
+            parts=[Part(text="Task text")],
         )
         task = await storage.submit_task("ctx-3", msg)
 
         result_msg = A2AMessage(
             role="agent",
-            kind="message",
             message_id="msg-3-result",
-            parts=[TextPart(kind="text", text="Done!")],
+            parts=[Part(text="Done!")],
         )
         updated = await storage.update_task(
             task["id"],
@@ -280,9 +277,8 @@ class TestTeamTaskStorage:
     ) -> None:
         msg = A2AMessage(
             role="user",
-            kind="message",
             message_id="msg-4",
-            parts=[TextPart(kind="text", text="Gonna fail")],
+            parts=[Part(text="Gonna fail")],
         )
         task = await storage.submit_task("ctx-4", msg)
 
@@ -301,9 +297,8 @@ class TestTeamTaskStorage:
     ) -> None:
         msg = A2AMessage(
             role="user",
-            kind="message",
             message_id="msg-5",
-            parts=[TextPart(kind="text", text="Cancel me")],
+            parts=[Part(text="Cancel me")],
         )
         task = await storage.submit_task("ctx-5", msg)
 
@@ -318,16 +313,15 @@ class TestTeamTaskStorage:
     ) -> None:
         msg = A2AMessage(
             role="user",
-            kind="message",
             message_id="msg-6",
-            parts=[TextPart(kind="text", text="Make artifact")],
+            parts=[Part(text="Make artifact")],
         )
         task = await storage.submit_task("ctx-6", msg)
 
         a2a_art = A2AArtifact(
             artifact_id="art-new",
             name="result",
-            parts=[TextPart(kind="text", text="artifact content")],
+            parts=[Part(text="artifact content")],
         )
         await storage.update_task(
             task["id"],
@@ -364,9 +358,8 @@ class TestTeamTaskStorage:
     ) -> None:
         msg = A2AMessage(
             role="user",
-            kind="message",
             message_id="msg-7",
-            parts=[TextPart(kind="text", text="My Title\nDescription line")],
+            parts=[Part(text="My Title\nDescription line")],
         )
         task = await storage.submit_task("ctx-7", msg)
 

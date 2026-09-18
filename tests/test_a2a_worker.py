@@ -19,7 +19,7 @@ from fasta2a.schema import (
     Artifact as A2AArtifact,
     Message as A2AMessage,
     TaskSendParams,
-    TextPart,
+    Part,
 )
 
 
@@ -99,9 +99,8 @@ class TestTeamMemberWorker:
     ) -> TaskSendParams:
         msg = A2AMessage(
             role="user",
-            kind="message",
             message_id="msg-1",
-            parts=[TextPart(kind="text", text=text)],
+            parts=[Part(text=text)],
         )
         if metadata is not None:
             msg["metadata"] = metadata
@@ -291,15 +290,13 @@ class TestTeamMemberWorker:
         history = [
             A2AMessage(
                 role="user",
-                kind="message",
                 message_id="h1",
-                parts=[TextPart(kind="text", text="Question")],
+                parts=[Part(text="Question")],
             ),
             A2AMessage(
                 role="agent",
-                kind="message",
                 message_id="h2",
-                parts=[TextPart(kind="text", text="Answer")],
+                parts=[Part(text="Answer")],
             ),
         ]
 
@@ -311,11 +308,10 @@ class TestTeamMemberWorker:
     def test_extract_prompt(self) -> None:
         msg = A2AMessage(
             role="user",
-            kind="message",
             message_id="x",
             parts=[
-                TextPart(kind="text", text="Part 1"),
-                TextPart(kind="text", text="Part 2"),
+                Part(text="Part 1"),
+                Part(text="Part 2"),
             ],
         )
         result = TeamMemberWorker._extract_prompt(msg)
@@ -324,7 +320,6 @@ class TestTeamMemberWorker:
     def test_extract_prompt_empty(self) -> None:
         msg = A2AMessage(
             role="user",
-            kind="message",
             message_id="x",
             parts=[],
         )
