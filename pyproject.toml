@@ -31,6 +31,16 @@ dependencies = [
 [project.scripts]
 agent-teams = "agent_teams.cli:main"
 
+# The Datalayer CLI discovers its extensions through this group: installing
+# agent-teams beside it is what makes `datalayer agent-teams` exist there.
+[project.entry-points."datalayer.cli"]
+agent-teams = "agent_teams.reactor_extension:plugin"
+
+# And through the reactor's own CLI group: `reactor agent-teams` wherever both
+# are installed, with the same plugin doing the extending.
+[project.entry-points."datalayer.reactor.cli"]
+agent-teams = "agent_teams.reactor_extension:plugin"
+
 [project.optional-dependencies]
 pydantic-ai = [
   "pydantic-graph>=1.94.0",
@@ -47,8 +57,14 @@ a2a = [
 mcp = [
     "mcp[cli]>=1.0",
 ]
+# The teams run on Datalayer (`agent-teams list|start|runs|status|…`) and the
+# reactor extension that makes them `datalayer agent-teams`. Not a dependency
+# of the library: the Datalayer CLI that hosts the group always has it.
+datalayer = [
+    "datalayer_core>=1.2.8",
+]
 all = [
-    "agent_teams[pydantic-ai,a2a,mcp]",
+    "agent_teams[pydantic-ai,a2a,mcp,datalayer]",
 ]
 test = [
   "pytest>=7.0",
@@ -91,6 +107,10 @@ asyncio_mode = "auto"
 filterwarnings = [
   "error",
   "ignore:There is no current event loop:DeprecationWarning",
+  # Datalayer core's own import-time notices, raised once the platform commands
+  # (`agent-teams[datalayer]`) import it; nothing of this package's.
+  "ignore:Datalayer is migrating its paths:DeprecationWarning",
+  "ignore:Support for class-based `config` is deprecated:DeprecationWarning",
   "ignore:datetime.datetime.utcnow:DeprecationWarning",
   "module:make_current is deprecated:DeprecationWarning",
   "module:clear_current is deprecated:DeprecationWarning",
@@ -147,3 +167,10 @@ ignore = [
 # suite: `ruff check tests/test_a2a_orchestration_extension.py` alone went
 # from 58 false positives to zero.
 "tests/*" = ["S101"]
+# The Typer command modules. B008: an option's default *is* a call —
+# `typer.Option(...)`, or core's shared `account_option()` / `output_option()`
+# — which is how Typer declares options. UP045: `Optional[X]`, not `X | None`,
+# because Typer reads these annotations at run time and this package still
+# supports Python 3.9, where `X | None` there is a TypeError.
+"agent_teams/cli.py" = ["B008", "UP045"]
+"agent_teams/platform_cli.py" = ["B008", "UP045"]

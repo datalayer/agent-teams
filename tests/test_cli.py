@@ -18,7 +18,9 @@ class TestCLIHelp:
     def test_main_help(self):
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
-        assert "Manage and orchestrate AI agent teams" in result.stdout
+        assert "Agent teams:" in result.stdout
+        # The self-hosted server's teams are their own group now; `serve` stays at the top.
+        assert "local" in result.stdout and "serve" in result.stdout
 
     def test_serve_help(self):
         result = runner.invoke(app, ["serve", "--help"])
@@ -27,57 +29,57 @@ class TestCLIHelp:
         assert "--host" in result.stdout
 
     def test_create_help(self):
-        result = runner.invoke(app, ["create", "--help"])
+        result = runner.invoke(app, ["local", "create", "--help"])
         assert result.exit_code == 0
         assert "CONFIG_FILE" in result.stdout
 
     def test_list_help(self):
-        result = runner.invoke(app, ["list", "--help"])
+        result = runner.invoke(app, ["local", "list", "--help"])
         assert result.exit_code == 0
 
     def test_status_help(self):
-        result = runner.invoke(app, ["status", "--help"])
+        result = runner.invoke(app, ["local", "status", "--help"])
         assert result.exit_code == 0
         assert "TEAM_ID" in result.stdout
 
     def test_start_help(self):
-        result = runner.invoke(app, ["start", "--help"])
+        result = runner.invoke(app, ["local", "start", "--help"])
         assert result.exit_code == 0
 
     def test_stop_help(self):
-        result = runner.invoke(app, ["stop", "--help"])
+        result = runner.invoke(app, ["local", "stop", "--help"])
         assert result.exit_code == 0
 
     def test_pause_help(self):
-        result = runner.invoke(app, ["pause", "--help"])
+        result = runner.invoke(app, ["local", "pause", "--help"])
         assert result.exit_code == 0
 
     def test_resume_help(self):
-        result = runner.invoke(app, ["resume", "--help"])
+        result = runner.invoke(app, ["local", "resume", "--help"])
         assert result.exit_code == 0
 
     def test_delete_help(self):
-        result = runner.invoke(app, ["delete", "--help"])
+        result = runner.invoke(app, ["local", "delete", "--help"])
         assert result.exit_code == 0
         assert "--force" in result.stdout
 
     def test_assign_help(self):
-        result = runner.invoke(app, ["assign", "--help"])
+        result = runner.invoke(app, ["local", "assign", "--help"])
         assert result.exit_code == 0
         assert "--priority" in result.stdout
 
     def test_metrics_help(self):
-        result = runner.invoke(app, ["metrics", "--help"])
+        result = runner.invoke(app, ["local", "metrics", "--help"])
         assert result.exit_code == 0
 
     def test_events_help(self):
-        result = runner.invoke(app, ["events", "--help"])
+        result = runner.invoke(app, ["local", "events", "--help"])
         assert result.exit_code == 0
         assert "--limit" in result.stdout
 
 
 class TestCLICreateMissingFile:
     def test_create_nonexistent_file(self):
-        result = runner.invoke(app, ["create", "/nonexistent/path.json"])
+        result = runner.invoke(app, ["local", "create", "/nonexistent/path.json"])
         assert result.exit_code == 1
         assert "not found" in result.output

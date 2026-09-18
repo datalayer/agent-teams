@@ -104,32 +104,32 @@ members:
 Then create the team:
 
 ```bash
-agent-teams create team.yaml
+agent-teams local create team.yaml
 ```
 
 ### 3. Manage the Team
 
 ```bash
 # List all teams
-agent-teams list
+agent-teams local list
 
 # Start the team
-agent-teams start <team-id>
+agent-teams local start <team-id>
 
 # Assign a task
-agent-teams assign <team-id> "Summarise Q4 revenue trends"
+agent-teams local assign <team-id> "Summarise Q4 revenue trends"
 
 # Check status
-agent-teams status <team-id>
+agent-teams local status <team-id>
 
 # View metrics
-agent-teams metrics <team-id>
+agent-teams local metrics <team-id>
 
 # Stream events
-agent-teams events <team-id>
+agent-teams local events <team-id>
 
 # Stop the team
-agent-teams stop <team-id>
+agent-teams local stop <team-id>
 ```
 
 ## Option C: REST API

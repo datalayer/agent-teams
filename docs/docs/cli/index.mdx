@@ -4,23 +4,82 @@ title: CLI Reference
 
 # CLI Reference
 
-Agent Teams provides a command-line interface built with [Typer](https://typer.tiangolo.com/). The CLI communicates with the Agent Teams REST API server.
+Agent Teams has a command-line interface built with
+[Typer](https://typer.tiangolo.com/), for two kinds of team:
+
+- **teams on Datalayer** — the catalogued teams, run on the platform's
+  orchestration control plane: list and show them, start one on a goal, follow
+  its run seat by seat, steer, pause, resume, cancel or terminate it;
+- **a self-hosted server's teams** — the teams an `agent-teams serve` server
+  holds, under `agent-teams local`.
 
 ## Installation
 
-The CLI is installed automatically with the package:
-
 ```bash
-pip install agent-teams
+pip install "agent-teams[datalayer]"
 ```
 
-The entry point is `agent-teams`:
+The `datalayer` extra brings Datalayer core, which the commands for teams on
+Datalayer run on; without it, only `serve` and `local` are there. The entry
+point is `agent-teams`:
 
 ```bash
 agent-teams --help
 ```
 
-## Commands
+### In the Datalayer CLI
+
+agent-teams is a [reactor](https://reactor.datalayer.tech/python-plugins/cli)
+extension of the Datalayer CLI: installed beside it, the same commands are
+`datalayer agent-teams …` — and `reactor agent-teams …` beside the `reactor`
+command. Nothing needs configuring; the package advertises itself under the
+`datalayer.cli` and `datalayer.reactor.cli` entry point groups.
+
+```bash
+datalayer agent-teams runs notebook-benchmark
+```
+
+## Teams on Datalayer
+
+A run of a team is one root execution on the orchestration control plane: the
+supervisor answers it, and each seat the team schedules is a child execution
+under it. These commands name a team by its id and a run by its root
+execution, and act on the whole tree through the same implementation as
+`datalayer executions`. They sign in as the Datalayer CLI does.
+
+| Command | What it does |
+|---------|--------------|
+| `list [--prefix …]` | The catalogued teams: id, name, mode (`sequential`, `parallel`, `supervisor`) and how many seats |
+| `show <team>` | Its supervisor and its seats in order: name, role, what each waits on, its goal |
+| `start <team> --goal … [--instructions …] [--criterion …] [--deadline …] [--watch]` | Start a run: the team's root execution, delegated the way a benchmark's team task is. `--watch` follows it until it is over |
+| `runs [<team>] [--active] [-n 20]` | A team's runs (every team's without one), latest first |
+| `status <run>` | The run's tree, seat by seat: status, attempts, when it last moved, and any error |
+| `monitor <run>` | Stream every event of the run's tree until every execution in it is over |
+| `steer <run> "<instructions>"` | Add instructions while the team works |
+| `pause <run> [--reason …]` / `resume <run> [--checkpoint …]` | Stop at the next checkpoint without losing anything, and go on |
+| `cancel <run> [--no-cascade]` | Stop the run and, by default, every seat under it; its history is kept |
+| `terminate <run> [--keep-worker]` | End the run for good and release its workers |
+| `artifacts <run>` | What the run produced, with every seat's by default |
+
+Every command takes `--account` to act in an organization and `-o json` for a
+machine-readable answer. A mutating command derives its idempotency key from
+what it asks, so running the same `start` twice is the same run; pass
+`--idempotency-key` to start another. `list` and `show` read the team catalogue
+that ships with agent-runtimes.
+
+```bash
+agent-teams show notebook-benchmark
+agent-teams start notebook-benchmark --goal "Profile customers.csv and report the duplicates" --watch
+agent-teams runs notebook-benchmark --active
+agent-teams status exec_5b8da50a4c83498d86a0b308bfb94909
+agent-teams pause exec_5b8da50a4c83498d86a0b308bfb94909 --reason "Waiting for the data owner"
+```
+
+## A self-hosted server
+
+The commands for a self-hosted agent-teams server — `serve` it, then create,
+start and task the teams it holds — talk to its REST API. Everything but
+`serve` is under `local`.
 
 ### `serve`
 
@@ -44,12 +103,12 @@ agent-teams serve --port 9000 --reload
 
 ---
 
-### `create`
+### `local create`
 
 Create a new team from a YAML or JSON configuration file.
 
 ```bash
-agent-teams create CONFIG_PATH [OPTIONS]
+agent-teams local create CONFIG_PATH [OPTIONS]
 ```
 
 | Option | Default | Description |
@@ -59,8 +118,8 @@ agent-teams create CONFIG_PATH [OPTIONS]
 **Example:**
 
 ```bash
-agent-teams create team.yaml
-agent-teams create config.json --server http://myserver:9000
+agent-teams local create team.yaml
+agent-teams local create config.json --server http://myserver:9000
 ```
 
 **Config file format (YAML):**
@@ -82,12 +141,12 @@ supervisor:
 
 ---
 
-### `list`
+### `local list`
 
 List all teams on the server.
 
 ```bash
-agent-teams list [OPTIONS]
+agent-teams local list [OPTIONS]
 ```
 
 | Option | Default | Description |
@@ -96,12 +155,12 @@ agent-teams list [OPTIONS]
 
 ---
 
-### `status`
+### `local status`
 
 Show detailed status of a team.
 
 ```bash
-agent-teams status TEAM_ID [OPTIONS]
+agent-teams local status TEAM_ID [OPTIONS]
 ```
 
 | Option | Default | Description |
@@ -110,52 +169,52 @@ agent-teams status TEAM_ID [OPTIONS]
 
 ---
 
-### `start`
+### `local start`
 
 Start a team (transition from `draft` or `stopped` to `running`).
 
 ```bash
-agent-teams start TEAM_ID [OPTIONS]
+agent-teams local start TEAM_ID [OPTIONS]
 ```
 
 ---
 
-### `stop`
+### `local stop`
 
 Stop a running or paused team.
 
 ```bash
-agent-teams stop TEAM_ID [OPTIONS]
+agent-teams local stop TEAM_ID [OPTIONS]
 ```
 
 ---
 
-### `pause`
+### `local pause`
 
 Pause a running team.
 
 ```bash
-agent-teams pause TEAM_ID [OPTIONS]
+agent-teams local pause TEAM_ID [OPTIONS]
 ```
 
 ---
 
-### `resume`
+### `local resume`
 
 Resume a paused team.
 
 ```bash
-agent-teams resume TEAM_ID [OPTIONS]
+agent-teams local resume TEAM_ID [OPTIONS]
 ```
 
 ---
 
-### `delete`
+### `local delete`
 
 Delete a team. The team must be stopped first (or use `--force`).
 
 ```bash
-agent-teams delete TEAM_ID [OPTIONS]
+agent-teams local delete TEAM_ID [OPTIONS]
 ```
 
 | Option | Default | Description |
@@ -165,12 +224,12 @@ agent-teams delete TEAM_ID [OPTIONS]
 
 ---
 
-### `assign`
+### `local assign`
 
 Assign a task to a team.
 
 ```bash
-agent-teams assign TEAM_ID DESCRIPTION [OPTIONS]
+agent-teams local assign TEAM_ID DESCRIPTION [OPTIONS]
 ```
 
 | Option | Default | Description |
@@ -182,28 +241,28 @@ agent-teams assign TEAM_ID DESCRIPTION [OPTIONS]
 **Example:**
 
 ```bash
-agent-teams assign abc123 "Analyse Q4 revenue trends" --priority high
-agent-teams assign abc123 "Write summary" --assigned-to writer
+agent-teams local assign abc123 "Analyse Q4 revenue trends" --priority high
+agent-teams local assign abc123 "Write summary" --assigned-to writer
 ```
 
 ---
 
-### `metrics`
+### `local metrics`
 
 Show team metrics (tasks completed, failed, active members, etc.).
 
 ```bash
-agent-teams metrics TEAM_ID [OPTIONS]
+agent-teams local metrics TEAM_ID [OPTIONS]
 ```
 
 ---
 
-### `events`
+### `local events`
 
 Show recent team events.
 
 ```bash
-agent-teams events TEAM_ID [OPTIONS]
+agent-teams local events TEAM_ID [OPTIONS]
 ```
 
 | Option | Default | Description |
@@ -211,29 +270,29 @@ agent-teams events TEAM_ID [OPTIONS]
 | `--limit` | `50` | Maximum number of events to show |
 | `--server` | `http://localhost:8765` | Server URL |
 
-## Typical Workflow
+### Typical workflow
 
 ```bash
 # 1. Start the server
 agent-teams serve &
 
 # 2. Create a team
-agent-teams create team.yaml
+agent-teams local create team.yaml
 # Output: Created team: abc-123-def
 
 # 3. Start the team
-agent-teams start abc-123-def
+agent-teams local start abc-123-def
 
 # 4. Assign tasks
-agent-teams assign abc-123-def "Research recent AI papers" --priority high
-agent-teams assign abc-123-def "Write executive summary"
+agent-teams local assign abc-123-def "Research recent AI papers" --priority high
+agent-teams local assign abc-123-def "Write executive summary"
 
 # 5. Monitor progress
-agent-teams status abc-123-def
-agent-teams metrics abc-123-def
-agent-teams events abc-123-def
+agent-teams local status abc-123-def
+agent-teams local metrics abc-123-def
+agent-teams local events abc-123-def
 
 # 6. Clean up
-agent-teams stop abc-123-def
-agent-teams delete abc-123-def
+agent-teams local stop abc-123-def
+agent-teams local delete abc-123-def
 ```

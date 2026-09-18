@@ -2,45 +2,39 @@
 #
 # BSD 3-Clause License
 
-"""CLI for agent-teams — manage and operate agent teams from the terminal.
+"""CLI for agent-teams — teams of agents, from the terminal.
 
-Built with `Typer <https://typer.tiangolo.com/>`_.  Entry point is
-``agent-teams`` (configured in pyproject.toml ``[project.scripts]``).
+Built with `Typer <https://typer.tiangolo.com/>`_. It is both the
+``agent-teams`` executable (``[project.scripts]``) and, through
+``agent_teams.reactor_extension``, the ``agent-teams`` group of the Datalayer
+CLI: ``datalayer agent-teams …`` wherever both are installed.
 
-Usage::
+Teams on Datalayer — the catalogued teams, run on the orchestration control
+plane (``agent_teams.platform_cli``, needs ``agent-teams[datalayer]``)::
 
-    # Start the API server
-    agent-teams serve --port 8765
-
-    # Create a team from a YAML/JSON config file
-    agent-teams create team.yaml
-
-    # List teams
     agent-teams list
+    agent-teams show notebook-benchmark
+    agent-teams start notebook-benchmark --goal "Profile customers.csv" --watch
+    agent-teams runs notebook-benchmark --active
+    agent-teams status <run>
+    agent-teams monitor | steer | pause | resume | cancel | terminate | artifacts <run>
 
-    # Show team status
-    agent-teams status <team-id>
+A self-hosted agent-teams server, and the teams it holds::
 
-    # Assign a task
-    agent-teams assign <team-id> "Analyse quarterly data"
-
-    # Start / stop / pause / resume
-    agent-teams start <team-id>
-    agent-teams stop  <team-id>
-
-    # Stream events (Server-Sent Events)
-    agent-teams events <team-id>
-
-    # Get team metrics
-    agent-teams metrics <team-id>
-
-    # Delete a team
-    agent-teams delete <team-id>
+    agent-teams serve --port 8765
+    agent-teams local create team.yaml
+    agent-teams local list
+    agent-teams local status <team-id>
+    agent-teams local assign <team-id> "Analyse quarterly data"
+    agent-teams local start | stop | pause | resume | delete <team-id>
+    agent-teams local events <team-id>
+    agent-teams local metrics <team-id>
 """
 
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -50,9 +44,26 @@ import typer
 
 app = typer.Typer(
     name="agent-teams",
-    help="Manage and orchestrate AI agent teams.",
+    help=(
+        "Agent teams: the catalogued teams run on Datalayer — list, show, start one, "
+        "follow, steer, pause, resume, cancel or terminate a run — and `local`, the teams "
+        "of a self-hosted agent-teams server (`agent-teams serve`)."
+    ),
     no_args_is_help=True,
 )
+
+#: The teams a self-hosted server holds (`agent-teams serve`). Under their own
+#: group since the platform's commands took the top level: five of the names —
+#: list, status, start, pause, resume — are the same words for other things.
+local_app = typer.Typer(
+    name="local",
+    help=(
+        "The teams of a self-hosted agent-teams server: create, list, assign, "
+        "start, stop, pause, resume, delete, events, metrics."
+    ),
+    no_args_is_help=True,
+)
+app.add_typer(local_app)
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +111,7 @@ def serve(
     )
 
 
-@app.command("create")
+@local_app.command("create")
 def create_team(
     config_file: Path = typer.Argument(..., help="Path to team config (YAML or JSON)"),
     server: str = typer.Option("localhost:8765", help="Server address"),
@@ -126,7 +137,7 @@ def create_team(
     typer.echo(f"Team created: {resp.json().get('id', 'unknown')}")
 
 
-@app.command("list")
+@local_app.command("list")
 def list_teams(
     server: str = typer.Option("localhost:8765", help="Server address"),
 ) -> None:
@@ -144,7 +155,7 @@ def list_teams(
         typer.echo(f"  {tid}  {name:30s}  {status:12s}  members={members}")
 
 
-@app.command()
+@local_app.command()
 def status(
     team_id: str = typer.Argument(..., help="Team ID"),
     server: str = typer.Option("localhost:8765", help="Server address"),
@@ -154,7 +165,7 @@ def status(
     _print_json(resp.json())
 
 
-@app.command()
+@local_app.command()
 def start(
     team_id: str = typer.Argument(..., help="Team ID"),
     server: str = typer.Option("localhost:8765", help="Server address"),
@@ -164,7 +175,7 @@ def start(
     typer.echo(f"Team {team_id} started.")
 
 
-@app.command()
+@local_app.command()
 def stop(
     team_id: str = typer.Argument(..., help="Team ID"),
     server: str = typer.Option("localhost:8765", help="Server address"),
@@ -174,7 +185,7 @@ def stop(
     typer.echo(f"Team {team_id} stopped.")
 
 
-@app.command()
+@local_app.command()
 def pause(
     team_id: str = typer.Argument(..., help="Team ID"),
     server: str = typer.Option("localhost:8765", help="Server address"),
@@ -184,7 +195,7 @@ def pause(
     typer.echo(f"Team {team_id} paused.")
 
 
-@app.command()
+@local_app.command()
 def resume(
     team_id: str = typer.Argument(..., help="Team ID"),
     server: str = typer.Option("localhost:8765", help="Server address"),
@@ -194,7 +205,7 @@ def resume(
     typer.echo(f"Team {team_id} resumed.")
 
 
-@app.command()
+@local_app.command()
 def delete(
     team_id: str = typer.Argument(..., help="Team ID"),
     server: str = typer.Option("localhost:8765", help="Server address"),
@@ -209,7 +220,7 @@ def delete(
     typer.echo(f"Team {team_id} deleted.")
 
 
-@app.command()
+@local_app.command()
 def assign(
     team_id: str = typer.Argument(..., help="Team ID"),
     title: str = typer.Argument(..., help="Task title"),
@@ -230,7 +241,7 @@ def assign(
     _print_json(resp.json())
 
 
-@app.command()
+@local_app.command()
 def metrics(
     team_id: str = typer.Argument(..., help="Team ID"),
     server: str = typer.Option("localhost:8765", help="Server address"),
@@ -240,7 +251,7 @@ def metrics(
     _print_json(resp.json())
 
 
-@app.command()
+@local_app.command()
 def events(
     team_id: str = typer.Argument(..., help="Team ID"),
     limit: int = typer.Option(50, help="Maximum events to show"),
@@ -258,6 +269,19 @@ def events(
         source = ev.get("source", "?")
         msg = ev.get("message", "")
         typer.echo(f"  [{ts}] {etype:25s} {source:15s} {msg}")
+
+
+# ---------------------------------------------------------------------------
+# Teams on Datalayer
+# ---------------------------------------------------------------------------
+
+# Only with Datalayer core (`agent-teams[datalayer]`), which the Datalayer CLI
+# hosting this group always has. Asked by its presence rather than by catching
+# an ImportError, so a mistake inside the commands is never mistaken for it.
+if importlib.util.find_spec("datalayer_core") is not None:
+    from agent_teams.platform_cli import register as _register_platform
+
+    _register_platform(app)
 
 
 # ---------------------------------------------------------------------------
