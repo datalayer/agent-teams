@@ -61,7 +61,7 @@ mcp = [
 # reactor extension that makes them `datalayer agent-teams`. Not a dependency
 # of the library: the Datalayer CLI that hosts the group always has it.
 datalayer = [
-    "datalayer_core>=1.2.8",
+    "datalayer_core>=1.2.12",
 ]
 all = [
     "agent_teams[pydantic-ai,a2a,mcp,datalayer]",
