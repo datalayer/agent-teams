@@ -44,7 +44,8 @@ jobs:
       - name: Install
         run: |
           uv pip install .
-          uv pip install .[a2a,test]
+          # datalayer: tests/test_platform_cli.py imports datalayer_core.orchestration.
+          uv pip install .[a2a,datalayer,test]
 
       - name: Run tests
         run: |

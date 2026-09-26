@@ -31,7 +31,7 @@ class TestCLIHelp:
     def test_create_help(self):
         result = runner.invoke(app, ["local", "create", "--help"])
         assert result.exit_code == 0
-        assert "CONFIG_FILE" in result.stdout
+        assert "config_file" in result.stdout
 
     def test_list_help(self):
         result = runner.invoke(app, ["local", "list", "--help"])
@@ -40,7 +40,7 @@ class TestCLIHelp:
     def test_status_help(self):
         result = runner.invoke(app, ["local", "status", "--help"])
         assert result.exit_code == 0
-        assert "TEAM_ID" in result.stdout
+        assert "team_id" in result.stdout
 
     def test_start_help(self):
         result = runner.invoke(app, ["local", "start", "--help"])
