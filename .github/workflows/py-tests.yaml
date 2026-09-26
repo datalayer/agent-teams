@@ -13,7 +13,7 @@ on:
       - 'agent_teams/**'
       - 'tests/**'
       - 'pyproject.toml'
-      - '.github/workflows/py-tests.yml'
+      - '.github/workflows/py-tests.yaml'
   pull_request:
     branches:
       - main
@@ -21,7 +21,7 @@ on:
       - 'agent_teams/**'
       - 'tests/**'
       - 'pyproject.toml'
-      - '.github/workflows/py-tests.yml'
+      - '.github/workflows/py-tests.yaml'
 
   workflow_dispatch:
 
@@ -44,7 +44,8 @@ jobs:
       - name: Install
         run: |
           uv pip install .
-          uv pip install .[a2a,test]
+          # datalayer: tests/test_platform_cli.py imports datalayer_core.orchestration.
+          uv pip install .[a2a,datalayer,test]
 
       - name: Run tests
         run: |

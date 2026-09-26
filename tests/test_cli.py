@@ -6,7 +6,8 @@
 
 from __future__ import annotations
 
-import pytest
+import re
+
 from typer.testing import CliRunner
 
 from agent_teams.cli import app
@@ -14,24 +15,34 @@ from agent_teams.cli import app
 runner = CliRunner()
 
 
+def plain(text: str) -> str:
+    """The text without its ANSI styling.
+
+    Typer forces a terminal (colours, bold, dim) whenever GITHUB_ACTIONS is
+    set, so on CI `--port` arrives as `\\x1b[1;36m--port` and a plain
+    substring check misses it.
+    """
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
+
+
 class TestCLIHelp:
     def test_main_help(self):
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
-        assert "Agent teams:" in result.stdout
+        assert "Agent teams:" in plain(result.stdout)
         # The self-hosted server's teams are their own group now; `serve` stays at the top.
-        assert "local" in result.stdout and "serve" in result.stdout
+        assert "local" in plain(result.stdout) and "serve" in result.stdout
 
     def test_serve_help(self):
         result = runner.invoke(app, ["serve", "--help"])
         assert result.exit_code == 0
-        assert "--port" in result.stdout
-        assert "--host" in result.stdout
+        assert "--port" in plain(result.stdout)
+        assert "--host" in plain(result.stdout)
 
     def test_create_help(self):
         result = runner.invoke(app, ["local", "create", "--help"])
         assert result.exit_code == 0
-        assert "CONFIG_FILE" in result.stdout
+        assert "config_file" in plain(result.stdout)
 
     def test_list_help(self):
         result = runner.invoke(app, ["local", "list", "--help"])
@@ -40,7 +51,7 @@ class TestCLIHelp:
     def test_status_help(self):
         result = runner.invoke(app, ["local", "status", "--help"])
         assert result.exit_code == 0
-        assert "TEAM_ID" in result.stdout
+        assert "team_id" in plain(result.stdout)
 
     def test_start_help(self):
         result = runner.invoke(app, ["local", "start", "--help"])
@@ -61,12 +72,12 @@ class TestCLIHelp:
     def test_delete_help(self):
         result = runner.invoke(app, ["local", "delete", "--help"])
         assert result.exit_code == 0
-        assert "--force" in result.stdout
+        assert "--force" in plain(result.stdout)
 
     def test_assign_help(self):
         result = runner.invoke(app, ["local", "assign", "--help"])
         assert result.exit_code == 0
-        assert "--priority" in result.stdout
+        assert "--priority" in plain(result.stdout)
 
     def test_metrics_help(self):
         result = runner.invoke(app, ["local", "metrics", "--help"])
@@ -75,11 +86,11 @@ class TestCLIHelp:
     def test_events_help(self):
         result = runner.invoke(app, ["local", "events", "--help"])
         assert result.exit_code == 0
-        assert "--limit" in result.stdout
+        assert "--limit" in plain(result.stdout)
 
 
 class TestCLICreateMissingFile:
     def test_create_nonexistent_file(self):
         result = runner.invoke(app, ["local", "create", "/nonexistent/path.json"])
         assert result.exit_code == 1
-        assert "not found" in result.output
+        assert "not found" in plain(result.output)

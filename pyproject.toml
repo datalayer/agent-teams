@@ -70,6 +70,11 @@ test = [
   "pytest>=7.0",
   "pytest-asyncio>=0.21",
   "httpx>=0.24",
+  # starlette's TestClient (imported through fastapi.testclient in
+  # tests/test_routes.py) falls back to raw httpx with a
+  # StarletteDeprecationWarning when httpx2 is absent; filterwarnings turns
+  # that into a collection error above.
+  "httpx2",
   # Unpinned floor fixed alongside the a2a-sdk pin below: `fasta2a` with no
   # ceiling is exactly the drift that renamed `A2AClient`'s `base_url`
   # argument to `agent` mid-air and broke every A2A dispatch in this
