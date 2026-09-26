@@ -1,6 +1,6 @@
 {
   "name": "@datalayer/agent-teams",
-  "version": "0.0.7",
+  "version": "1.0.0",
   "description": "The Datalayer orchestration A2A extension — standalone, built on no framework, consumed by any A2A client or worker.",
   "type": "module",
   "license": "BSD-3-Clause",
