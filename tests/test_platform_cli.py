@@ -191,6 +191,30 @@ def invoke(*args: str) -> Any:
     return runner.invoke(app, list(args))
 
 
+def _has_catalogue() -> bool:
+    """Whether agent-runtimes' team catalogue can actually be imported here.
+
+    Both ``_catalogue()`` and ``seat_words()`` (agent_teams/platform_cli.py)
+    treat agent-runtimes as optional, falling back gracefully when it is
+    absent — the tests below do the same, rather than declaring a hard
+    dependency on it: agent-runtimes itself depends on a narrow range of
+    agent-teams (pinned to the width of one release, since a 0.0.x package
+    makes no compatibility promise across even a patch bump), so the two
+    cannot always be installed together in the same environment.
+    """
+    try:
+        import agent_runtimes.specs.teams  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+requires_catalogue = pytest.mark.skipif(
+    not _has_catalogue(), reason="the team catalogue ships with agent-runtimes"
+)
+
+
+@requires_catalogue
 class TestTheCatalogue:
     def test_lists_every_catalogued_team(self) -> None:
         listed = json.loads(plain(invoke("list", "-o", "json").stdout))["teams"]
@@ -212,6 +236,7 @@ class TestTheCatalogue:
 
 
 class TestARun:
+    @requires_catalogue
     def test_start_delegates_to_the_team_as_a_benchmark_task_does(self) -> None:
         started = invoke(
             "start",
@@ -235,6 +260,7 @@ class TestARun:
         assert command.idempotency_key.startswith("cmd-")
         assert "Started Notebook Benchmark Team" in plain(started.stdout)
 
+    @requires_catalogue
     def test_runs_are_a_teams_roots_latest_first_and_nothing_else(self) -> None:
         listed = json.loads(plain(invoke("runs", "notebook-benchmark", "-o", "json").stdout))[
             "runs"
@@ -250,6 +276,7 @@ class TestARun:
         active = json.loads(plain(invoke("runs", "--active", "-o", "json").stdout))["runs"]
         assert [run["executionId"] for run in active] == ["exec_live"]
 
+    @requires_catalogue
     def test_status_shows_the_tree_seat_by_seat(self) -> None:
         shown = json.loads(plain(invoke("status", "exec_root", "-o", "json").stdout))
         assert RECORDED["listed"] == "exec_root"
