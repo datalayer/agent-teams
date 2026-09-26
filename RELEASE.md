@@ -9,17 +9,18 @@
 One tag releases both packages, with no stored token: PyPI and npm trust
 `.github/workflows/release.yaml` through OIDC (trusted publishing).
 
-| Package                 | Registry | Version from                  | GitHub environment |
-| ----------------------- | -------- | ----------------------------- | ------------------ |
-| `agent-teams`           | PyPI     | `agent_teams/__version__.py`  | `pypi`             |
-| `@datalayer/agent-teams` | npm     | `package.json`                | `npm`              |
+| Package                  | Registry | Version from                 | GitHub environment |
+| ------------------------ | -------- | ---------------------------- | ------------------ |
+| `agent-teams`            | PyPI     | `agent_teams/__version__.py` | `pypi`             |
+| `@datalayer/agent-teams` | npm      | `package.json`               | `npm`              |
 
 Both carry **one version**, the one the tag names.
 
 ## Steps
 
 1. Bump the version in both files, on a branch, and open a pull request.
-2. Merge, then tag the merge commit and push the tag:
+
+1. Merge, then tag the merge commit and push the tag:
 
    ```bash
    git checkout main && git pull
@@ -27,7 +28,7 @@ Both carry **one version**, the one the tag names.
    git push origin vX.Y.Z
    ```
 
-3. The `Release` workflow checks that the tag names both versions, builds the
+1. The `Release` workflow checks that the tag names both versions, builds the
    wheel, the sdist and the npm tarball, publishes what is not on the
    registries yet, and creates a GitHub release with generated notes.
 
