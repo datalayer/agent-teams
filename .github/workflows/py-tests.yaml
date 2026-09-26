@@ -13,7 +13,7 @@ on:
       - 'agent_teams/**'
       - 'tests/**'
       - 'pyproject.toml'
-      - '.github/workflows/py-tests.yml'
+      - '.github/workflows/py-tests.yaml'
   pull_request:
     branches:
       - main
@@ -21,7 +21,7 @@ on:
       - 'agent_teams/**'
       - 'tests/**'
       - 'pyproject.toml'
-      - '.github/workflows/py-tests.yml'
+      - '.github/workflows/py-tests.yaml'
 
   workflow_dispatch:
 
