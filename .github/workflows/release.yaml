@@ -140,7 +140,12 @@ jobs:
           for tarball in dist/*.tgz; do
             # "./": npm reads a bare "dist/x.tgz" as the GitHub shorthand
             # github:dist/x.tgz and refuses to fetch it (EALLOWGIT).
-            npm publish "./$tarball" --provenance --access public
+            # No --provenance: this repository is private, and npm refuses a
+            # provenance statement from a private one (E422, v0.0.7's run).
+            # Under trusted publishing npm attaches provenance by itself
+            # whenever the repository is public, so nothing is lost the day
+            # it becomes public.
+            npm publish "./$tarball" --access public
           done
 
   release:

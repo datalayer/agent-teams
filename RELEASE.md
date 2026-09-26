@@ -38,8 +38,11 @@ Both carry **one version**, the one the tag names.
   workflow `release.yaml`, environment `pypi`.
 - npm package `@datalayer/agent-teams`: GitHub Actions, organization
   `datalayer`, repository `agent-teams`, workflow filename `release.yaml`,
-  environment `npm`. npm provenance also checks `package.json`'s
-  `repository.url`, which names this repository.
+  environment `npm`. The repository is private, so npm publishes without a
+  provenance statement (npm refuses one from a private repository); it
+  attaches provenance by itself once the repository is public, and
+  provenance then checks `package.json`'s `repository.url`, which names
+  this repository.
 
 The registry matches the repository, the workflow filename and the
 environment exactly; renaming any of them means re-registering.
