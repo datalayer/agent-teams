@@ -12,7 +12,7 @@ authors = [{ name = "Datalayer", email = "info@datalayer.io" }]
 dynamic = ["version"]
 readme = "README.md"
 requires-python = ">=3.10"
-keywords = ["Jupyter", "AI", "Agents", "Teams", "A2A", "Orchestration"]
+keywords = ["AI", "Agents", "Teams", "A2A", "Orchestration", "Jupyter"]
 classifiers = [
   "Intended Audience :: Developers",
   "Intended Audience :: System Administrators",
@@ -44,7 +44,7 @@ agent-teams = "agent_teams.reactor_extension:plugin"
 [project.optional-dependencies]
 pydantic-ai = [
   "pydantic-graph>=1.94.0",
-  "pydantic-ai-slim>=1.94.0",
+  "pydantic-ai-slim>=2.35.0,<3",
 ]
 a2a = [
     # No floor and no ceiling left every install resolve to whatever was
@@ -55,13 +55,24 @@ a2a = [
     "fasta2a>=2.0.0,<2.1",
 ]
 mcp = [
-    "mcp[cli]>=1.0",
+    "mcp[cli]>=2.0",
 ]
 # The teams run on Datalayer (`agent-teams list|start|runs|status|…`) and the
 # reactor extension that makes them `datalayer agent-teams`. Not a dependency
 # of the library: the Datalayer CLI that hosts the group always has it.
 datalayer = [
     "datalayer_core>=1.2.12",
+]
+# The landing's demo team (`agent-teams demo deploy|status|url|stop`): the
+# team and application specs, and agent-runtimes' client and launch helpers,
+# which reserve the runtime and serve the application over A2A. Not in
+# `datalayer`: agent-runtimes depends on this package.
+demo = [
+    "agent_teams[datalayer]",
+    # 1.3.71: sends DATALAYER_MAGIC_API_KEY with the runtime it creates, and
+    # reads whether a runtime is unmetered.
+    "agent-runtimes>=1.3.71",
+    "agentspecs>=0.0.37",
 ]
 all = [
     "agent_teams[pydantic-ai,a2a,mcp,datalayer]",
@@ -70,26 +81,26 @@ test = [
   "pytest>=7.0",
   "pytest-asyncio>=0.21",
   "httpx>=0.24",
-  # starlette's TestClient (imported through fastapi.testclient in
+  # starlette''s TestClient (imported through fastapi.testclient in
   # tests/test_routes.py) falls back to raw httpx with a
   # StarletteDeprecationWarning when httpx2 is absent; filterwarnings turns
   # that into a collection error above.
   "httpx2",
   # Unpinned floor fixed alongside the a2a-sdk pin below: `fasta2a` with no
-  # ceiling is exactly the drift that renamed `A2AClient`'s `base_url`
+  # ceiling is exactly the drift that renamed `A2AClient`''s `base_url`
   # argument to `agent` mid-air and broke every A2A dispatch in this
   # package silently (found and fixed in the a2a extra, ORCHESTRATOR.md
   # O3-02) — the same risk was still sitting here, unpinned, in the test
   # dependency that installs the same package.
   "fasta2a>=2.0.0,<2.1",
   "anyio",
-  # The A2A project's own reference implementation (a2a-protocol.org),
+  # The A2A project''s own reference implementation (a2a-protocol.org),
   # independent of `fasta2a` — which Datalayer contributes to — used only
   # to drive `tests/test_standard_client_compatibility.py`
-  # (ORCHESTRATOR.md O3-05): a standard client against this package's
-  # worker, and a standard, non-Datalayer worker against this package's
-  # own dispatch pattern. Pinned, not floored: "against a pinned
-  # third-party implementation" is this item's own done-when.
+  # (ORCHESTRATOR.md O3-05): a standard client against this package''s
+  # worker, and a standard, non-Datalayer worker against this package''s
+  # own dispatch pattern. Pinned, not floored: ''against a pinned
+  # third-party implementation'' is this item''s own done-when.
   "a2a-sdk[all]==0.3.26",
 ]
 lint = ["mdformat>0.7", "mdformat-gfm>=0.3.5", "ruff"]
@@ -179,3 +190,4 @@ ignore = [
 # supports Python 3.9, where `X | None` there is a TypeError.
 "agent_teams/cli.py" = ["B008", "UP045"]
 "agent_teams/platform_cli.py" = ["B008", "UP045"]
+"agent_teams/demo_cli.py" = ["B008", "UP045"]
