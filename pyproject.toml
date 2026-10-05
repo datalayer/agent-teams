@@ -69,7 +69,7 @@ datalayer = [
 # `datalayer`: agent-runtimes depends on this package.
 demo = [
     "agent_teams[datalayer]",
-    "agent-runtimes>=1.3.62",
+    "agent-runtimes>=1.3.63",
     "agentspecs>=0.0.37",
 ]
 all = [
