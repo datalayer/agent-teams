@@ -75,6 +75,44 @@ agent-teams status exec_5b8da50a4c83498d86a0b308bfb94909
 agent-teams pause exec_5b8da50a4c83498d86a0b308bfb94909 --reason "Waiting for the data owner"
 ```
 
+## The demo team
+
+The landing's anonymous page shows a team of two applications, the agentspecs
+team `sales-and-accounting`: **Sales** runs in the visitor's browser, and
+**Accounting** (the `accounting` application: the `worker-accountant` agent,
+the `odoo-accounting` MCP server, read only) runs in the cloud. `demo` puts the
+members that run in the cloud on Datalayer, under your own account:
+
+```bash
+pip install "agent-teams[demo]"
+```
+
+The `demo` extra brings agent-runtimes and agentspecs: the team and
+application specs, and the client that reserves the runtime. You are the
+person the `datalayer` CLI signs in as: `datalayer login`, or
+`DATALAYER_API_KEY`.
+
+| Command | What it does |
+|---------|--------------|
+| `demo deploy [--dry-run] [-e <environment>] [-m 480] [-o json]` | Each member whose `runs_in` is `runtime` gets a cloud runtime of yours, named `agent-teams-demo-<team>-<member>`, configured with its application served over A2A and open to visitors. Prints the A2A address, the agent card and the landing setting (`demoTeam.accountingA2AUrl`) to set. Run again, it reuses the runtime it finds by that name. `--dry-run` says what would be launched and configured, and what it would cost at most, and launches nothing |
+| `demo status [-o json]` | Each member: where it runs, how it stands (`serving`, `not deployed`, …), its A2A address, its runtime and the time left |
+| `demo url [--member accounting]` | Only the A2A address, for scripts; fails when the member is not deployed or not serving |
+| `demo stop` | Stops the team's demo runtimes |
+
+Every command takes `--team` for another team spec. A deploy refuses before
+launching anything when nobody is signed in, when the credits left cannot
+cover the reservation, or when Datalayer refuses the launch; a runtime it
+launched is stopped again when it does not come up or does not take the
+application.
+
+```bash
+datalayer agent-teams demo deploy --dry-run
+datalayer agent-teams demo deploy
+datalayer agent-teams demo status
+datalayer agent-teams demo url
+datalayer agent-teams demo stop
+```
+
 ## A self-hosted server
 
 The commands for a self-hosted agent-teams server — `serve` it, then create,

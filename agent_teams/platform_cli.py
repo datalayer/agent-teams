@@ -533,6 +533,10 @@ def register(app: typer.Typer) -> None:
         "artifacts",
         help="What a run produced: the artifacts of its root and, by default, of every seat.",
     )(core_executions.artifacts)
+    # The landing's demo team, deployed under the person's account.
+    from agent_teams.demo_cli import register as register_demo
+
+    register_demo(app)
 
 
 __all__ = ["register"]
