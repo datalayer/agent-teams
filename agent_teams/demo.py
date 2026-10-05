@@ -27,6 +27,7 @@ what it answers, so the commands are tested against a fake of it.
 
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -44,9 +45,16 @@ VISITORS_FIELD = "visitors"
 #: deploy finds its runtime again by this name, so a second deploy reuses it.
 RUNTIME_PREFIX = "agent-teams-demo"
 
-#: How long a new demo runtime is reserved, in minutes, unless told otherwise:
-#: the longest reservation Datalayer takes (agent-runtimes' ``MAX_MINUTES``).
-DEFAULT_MINUTES = 480
+#: The longest reservation Datalayer takes, in minutes (agent-runtimes' ``MAX_MINUTES``).
+MAX_MINUTES = 480
+
+#: How long a new demo runtime is reserved, in minutes, unless told otherwise.
+DEFAULT_MINUTES = MAX_MINUTES
+
+#: The platform's magic key. Set, agent-runtimes' client sends it with every
+#: runtime it creates, and Datalayer starts the runtime unmetered: it consumes
+#: no credits and never expires. The demo only reads whether it is set.
+MAGIC_API_KEY_ENV = "DATALAYER_MAGIC_API_KEY"
 
 #: How long a new runtime has to answer before it is given back.
 READY_TIMEOUT = 300.0
@@ -65,6 +73,11 @@ NOT_SIGNED_IN = "Not signed in to Datalayer: run `datalayer login`, or set DATAL
 NEEDS_DEMO_EXTRA = (
     "The demo team needs agent-runtimes and agentspecs: `pip install 'agent-teams[demo]'`."
 )
+
+
+def unmetered() -> bool:
+    """Whether the runtimes a deploy launches are unmetered: the magic key is set."""
+    return bool(os.environ.get(MAGIC_API_KEY_ENV, "").strip())
 
 
 def landing_setting(member_id: str) -> str:
@@ -237,11 +250,19 @@ class Cloud:
         return str(profile.handle_s)
 
     def offer(self) -> Any:
-        """The environments, the person's running runtimes and the credits left."""
+        """The environments, the person's running runtimes and the credits left.
+
+        The running runtimes are listed again through :meth:`running`, which
+        fails the command when Datalayer does not list them. ``read_offer``
+        reads a failed listing as nothing running, which here would plan a
+        second runtime of the same name, and charge for it.
+        """
         try:
-            return self._launch.read_offer(self.client)
+            offer = self._launch.read_offer(self.client)
         except self._launch.CloudRefused as refused:
             raise OrchestrationCommandError(str(refused)) from None
+        offer.running = self.running()
+        return offer
 
     def running(self) -> list[Any]:
         """The person's running runtimes."""
@@ -266,9 +287,14 @@ class Cloud:
         return float(self._launch.credits_for(environment, minutes))
 
     def create(self, name: str, environment: Any, minutes: int) -> Any:
-        """Reserve a runtime, named, in an environment."""
+        """Reserve a runtime, named, in an environment.
+
+        With the magic key set, the runtime must come back unmetered: one that
+        does not was launched by a Datalayer that does not take the key yet,
+        and is stopped rather than left to charge.
+        """
         try:
-            return self.client.create_runtime(
+            runtime = self.client.create_runtime(
                 name=name,
                 environment=environment.name,
                 time_reservation=minutes,
@@ -276,6 +302,14 @@ class Cloud:
             )
         except (RuntimeError, ValueError) as error:
             raise OrchestrationCommandError(f"Datalayer refused the launch: {error}") from None
+        if unmetered() and not getattr(runtime, "unmetered", False):
+            stopped = self.stop(str(runtime.uid))
+            raise OrchestrationCommandError(
+                f"{MAGIC_API_KEY_ENV} is set and Datalayer launched {runtime.uid} metered: "
+                "its services do not take the magic key yet. "
+                + (f"{runtime.uid} was stopped." if stopped else f"Stopping {runtime.uid} failed.")
+            )
+        return runtime
 
     def stop(self, uid: str) -> bool:
         """Stop a runtime; whether Datalayer said it stopped."""
@@ -332,6 +366,8 @@ class Step:
     environment: Any | None = None
     minutes: int = 0
     cost: float = 0.0
+    #: Launched on the magic key: no credits, no expiry.
+    unmetered: bool = False
 
     @property
     def reuses(self) -> bool:
@@ -345,7 +381,13 @@ def plan(
     environment: str | None,
     minutes: int,
 ) -> list[Step]:
-    """Each hosted member's step, checked against the environments and the credits."""
+    """Each hosted member's step, checked against the environments and the credits.
+
+    With the magic key set (:func:`unmetered`), a launch costs nothing and no
+    credit is asked; ``minutes`` is still validated and sent, and Datalayer
+    ignores it for a runtime that never expires.
+    """
+    free = unmetered()
     offer = cloud.offer()
     steps: list[Step] = []
     for member in team.hosted:
@@ -357,11 +399,16 @@ def plan(
         chosen = cloud.environment(offer, environment)
         steps.append(
             Step(
-                member, name, environment=chosen, minutes=minutes, cost=cloud.cost(chosen, minutes)
+                member,
+                name,
+                environment=chosen,
+                minutes=minutes,
+                cost=0.0 if free else cloud.cost(chosen, minutes),
+                unmetered=free,
             )
         )
     launching = [step for step in steps if not step.reuses]
-    if launching:
+    if launching and not free:
         check_credits(offer.credits, sum(step.cost for step in launching), len(launching), minutes)
     return steps
 

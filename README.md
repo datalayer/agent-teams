@@ -29,7 +29,10 @@ datalayer agent-teams demo url
 datalayer agent-teams demo stop
 ```
 
-See the [CLI reference](docs/docs/cli/index.mdx#the-demo-team).
+With `DATALAYER_MAGIC_API_KEY` set (the platform's magic key, a secret), the
+runtime is launched unmetered: no credits, and it never expires; `--dry-run`
+says `unmetered: yes` and `status` shows `never` for the time left. See the
+[CLI reference](docs/docs/cli/index.mdx#the-demo-team).
 
 ## The Datalayer orchestration extension
 

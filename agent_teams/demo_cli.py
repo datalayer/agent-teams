@@ -13,7 +13,8 @@
 every member that runs on a runtime on a cloud runtime of your own, served
 over A2A and open to the landing's visitors; it prints the address and the
 landing setting that takes it. Run again, it reuses the runtime it launched.
-See :mod:`agent_teams.demo`.
+With ``DATALAYER_MAGIC_API_KEY`` set, a runtime it launches is unmetered: it
+consumes no credits and never expires. See :mod:`agent_teams.demo`.
 """
 
 from __future__ import annotations
@@ -69,7 +70,11 @@ def deploy(
         "--minutes",
         "-m",
         min=1,
-        help="How long a new runtime is reserved.",
+        max=demo.MAX_MINUTES,
+        help=(
+            f"How long a new runtime is reserved, at most {demo.MAX_MINUTES}; "
+            "ignored with DATALAYER_MAGIC_API_KEY set, which launches it to never expire."
+        ),
     ),
     dry_run: bool = typer.Option(
         False,
@@ -97,6 +102,8 @@ def deploy(
                 f"  then POST {row['configure']} with {row['app']}, a2a: true, "
                 f"public_url: {row['publicUrl']}, {demo.VISITORS_FIELD}: true"
             )
+            if row["reuse"] is None:
+                say(f"  unmetered: {'yes' if row['unmetered'] else 'no'}")
         say("Dry run: nothing was launched or configured.")
         return
     rows = [_deploy_one(cloud, step, quiet=quiet) for step in steps]
@@ -105,7 +112,7 @@ def deploy(
     for row in rows:
         say(
             f"{row['label']} is served over A2A on runtime {row['runtime']}, "
-            f"open to visitors ({row['minutesLeft']} min left)."
+            f"open to visitors ({_left_words(row)})."
         )
         say(f"  A2A:  {row['a2a']}")
         say(f"  Card: {row['card']}")
@@ -114,12 +121,36 @@ def deploy(
         say(f"  {row['setting']} = {row['a2a']}")
 
 
+def _is_unmetered(runtime: Any) -> bool:
+    return bool(getattr(runtime, "unmetered", False))
+
+
+def _minutes_left(cloud: Any, runtime: Any) -> int | None:
+    """The minutes a runtime has left; None for an unmetered one, which never expires."""
+    return None if _is_unmetered(runtime) else cloud.minutes_left(runtime)
+
+
+def _left_words(row: dict[str, Any]) -> str:
+    """The time a row's runtime has left, in words."""
+    if row.get("unmetered"):
+        return "never expires"
+    left = row.get("minutesLeft")
+    return f"{left if left is not None else '?'} min left"
+
+
 def _step_words(cloud: Any, step: demo.Step) -> str:
     if step.reuses:
-        left = cloud.minutes_left(step.runtime)
+        left = _left_words(
+            {
+                "unmetered": _is_unmetered(step.runtime),
+                "minutesLeft": _minutes_left(cloud, step.runtime),
+            }
+        )
+        return f"{step.member.label}: reusing runtime {step.runtime.uid} ({left})."
+    if step.unmetered:
         return (
-            f"{step.member.label}: reusing runtime {step.runtime.uid} "
-            f"({left if left is not None else '?'} min left)."
+            f"{step.member.label}: launching {step.name} in {step.environment.name}, "
+            "unmetered (no credits, never expires)."
         )
     return (
         f"{step.member.label}: launching {step.name} in {step.environment.name} "
@@ -135,8 +166,9 @@ def _dry_row(cloud: Any, step: demo.Step) -> dict[str, Any]:
         "runtimeName": step.name,
         "reuse": step.runtime.uid if step.reuses else None,
         "environment": None if step.reuses else step.environment.name,
-        "minutes": None if step.reuses else step.minutes,
+        "minutes": None if step.reuses or step.unmetered else step.minutes,
         "maxCredits": None if step.reuses else round(step.cost, 2),
+        "unmetered": _is_unmetered(step.runtime) if step.reuses else step.unmetered,
         "configure": f"{base}/api/v1/apps/configure",
         "publicUrl": base,
         "setting": demo.landing_setting(step.member.id),
@@ -145,40 +177,54 @@ def _dry_row(cloud: Any, step: demo.Step) -> dict[str, Any]:
 
 def _deploy_one(cloud: Any, step: demo.Step, *, quiet: bool) -> dict[str, Any]:
     """Launch or reuse a member's runtime and configure it; a runtime launched here
-    is given back when it does not come up or does not take the application."""
+    is given back when anything after its launch fails.
+
+    Anything: a refusal said in words, and as much a timeout or a refused
+    connection from the runtime, an answer that is not JSON, or one without
+    the address — whatever escaped would leave the runtime running, and
+    charging, with nobody using it.
+    """
     runtime = step.runtime
     launched = runtime is None
     if launched:
         runtime = cloud.create(step.name, step.environment, step.minutes)
         if not quiet:
             say(f"{step.member.label}: waiting for runtime {runtime.uid}…")
-    base = cloud.base(runtime)
     try:
+        base = cloud.base(runtime)
         if launched and not demo.wait_until_ready(cloud, base):
             raise OrchestrationCommandError(f"The runtime {runtime.uid} did not come up in time.")
         served = demo.configure(cloud, step.member, base)
-    except OrchestrationCommandError as error:
+        address = str(served["url"])
+        return {
+            "member": step.member.id,
+            "label": step.member.label,
+            "runtime": str(runtime.uid),
+            "reused": not launched,
+            "unmetered": _is_unmetered(runtime),
+            "minutesLeft": _minutes_left(cloud, runtime),
+            "a2a": address,
+            "card": served.get("card") or demo.card_address(address),
+            "setting": demo.landing_setting(step.member.id),
+        }
+    except Exception as error:
+        message = (
+            str(error)
+            if isinstance(error, OrchestrationCommandError)
+            else f"{step.member.label} was not configured on {runtime.uid} "
+            f"({type(error).__name__}: {error})."
+        )
         if not launched:
-            raise
+            raise OrchestrationCommandError(message) from None
         stopped = cloud.stop(str(runtime.uid))
         raise OrchestrationCommandError(
-            f"{error} "
+            f"{message} "
             + (
                 f"The runtime {runtime.uid} was stopped."
                 if stopped
                 else f"Stopping {runtime.uid} failed: `datalayer agent-teams demo stop`."
             )
         ) from None
-    return {
-        "member": step.member.id,
-        "label": step.member.label,
-        "runtime": str(runtime.uid),
-        "reused": not launched,
-        "minutesLeft": cloud.minutes_left(runtime),
-        "a2a": served["url"],
-        "card": served.get("card") or demo.card_address(served["url"]),
-        "setting": demo.landing_setting(step.member.id),
-    }
 
 
 def _state_rows(cloud: Any, team: demo.DemoTeam) -> list[dict[str, Any]]:
@@ -191,6 +237,7 @@ def _state_rows(cloud: Any, team: demo.DemoTeam) -> list[dict[str, Any]]:
             "state": "in the visitor's browser",
             "a2a": None,
             "runtime": None,
+            "unmetered": False,
             "minutesLeft": None,
         }
         if member.hosted:
@@ -203,7 +250,8 @@ def _state_rows(cloud: Any, team: demo.DemoTeam) -> list[dict[str, Any]]:
                 row.update(
                     a2a=address,
                     runtime=str(runtime.uid),
-                    minutesLeft=cloud.minutes_left(runtime),
+                    unmetered=_is_unmetered(runtime),
+                    minutesLeft=_minutes_left(cloud, runtime),
                     state=(
                         "serving"
                         if answered == 200
@@ -235,7 +283,7 @@ def status(team_id: str = team_option(), output: OutputFormat = output_option())
             row["state"],
             row["a2a"] or "",
             row["runtime"] or "",
-            f"{left} min" if left is not None else "",
+            "never" if row["unmetered"] else f"{left} min" if left is not None else "",
         )
     console.print(table)
 

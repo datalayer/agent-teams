@@ -96,6 +96,12 @@ def the_specs(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(demo, "_agentspecs", lambda: (teams, apps))
 
 
+@pytest.fixture(autouse=True)
+def no_magic_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every launch is metered unless a test sets the platform's magic key."""
+    monkeypatch.delenv(demo.MAGIC_API_KEY_ENV, raising=False)
+
+
 class Runtime(SimpleNamespace):
     pass
 
@@ -408,6 +414,7 @@ class TestStatusUrlStop:
             "state": "in the visitor's browser",
             "a2a": None,
             "runtime": None,
+            "unmetered": False,
             "minutesLeft": None,
         }
         assert accounting == {
@@ -416,6 +423,7 @@ class TestStatusUrlStop:
             "state": "serving",
             "a2a": ADDRESS,
             "runtime": UID,
+            "unmetered": False,
             "minutesLeft": 472,
         }
 
@@ -539,6 +547,187 @@ class TestTheCloud:
         monkeypatch.setattr(demo, "_launch", lambda: self.launch(lambda _: (client, "tok")))
         with pytest.raises(demo.OrchestrationCommandError, match="Datalayer refused the launch"):
             demo.Cloud().create(NAME, ENVIRONMENT, 60)
+
+
+class TestTheOfferListsWhatRuns:
+    """A listing that fails fails the command; it never reads as nothing deployed."""
+
+    def a_cloud(self, monkeypatch: pytest.MonkeyPatch, list_runtimes: Any) -> Any:
+        class CloudRefused(Exception):  # noqa: N818 - agent-runtimes' name
+            pass
+
+        def read_offer(client: Any) -> Any:
+            # agent-runtimes' read_offer: a failed listing reads as nothing running.
+            try:
+                running = list(client.list_runtimes())
+            except Exception:
+                running = []
+            return SimpleNamespace(environments=[ENVIRONMENT], running=running, credits=1000.0)
+
+        launch = SimpleNamespace(
+            make_client=lambda: (SimpleNamespace(list_runtimes=list_runtimes), "tok"),
+            NotSignedIn=type("NotSignedIn", (Exception,), {}),
+            CloudRefused=CloudRefused,
+            read_offer=read_offer,
+        )
+        monkeypatch.setattr(demo, "_launch", lambda: launch)
+        return demo.Cloud()
+
+    def test_a_listing_that_fails_plans_no_launch(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def list_runtimes() -> list[Any]:
+            raise RuntimeError("502 Bad Gateway")
+
+        the_cloud = self.a_cloud(monkeypatch, list_runtimes)
+        with pytest.raises(demo.OrchestrationCommandError, match="did not list your runtimes"):
+            demo.plan(the_cloud, demo.read_team(demo.DEMO_TEAM), environment=None, minutes=60)
+
+    def test_what_runs_is_reused(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        the_cloud = self.a_cloud(monkeypatch, lambda: [a_runtime()])
+        [step] = demo.plan(the_cloud, demo.read_team(demo.DEMO_TEAM), environment=None, minutes=60)
+        assert step.reuses
+
+
+class TestMinutes:
+    @pytest.mark.parametrize("minutes", ("0", "481"))
+    def test_outside_the_platform_range_is_refused(self, cloud: FakeCloud, minutes: str) -> None:
+        result = invoke("deploy", "--dry-run", "--minutes", minutes)
+        assert result.exit_code == 2
+        assert cloud.created == []
+
+    def test_the_platform_maximum_is_taken(self, cloud: FakeCloud) -> None:
+        assert invoke("deploy", "--dry-run", "--minutes", "480").exit_code == 0
+
+
+class TestAnythingAfterTheLaunchGivesItBack:
+    """Not only a refusal in words: a timeout, a refused connection, an answer that
+    is not JSON — whatever fails once the runtime is launched stops it."""
+
+    @pytest.mark.parametrize(
+        "failure",
+        (
+            httpx.ReadTimeout("timed out"),
+            httpx.ConnectError("refused"),
+        ),
+    )
+    def test_a_transport_failure_while_configuring(
+        self, monkeypatch: pytest.MonkeyPatch, failure: Exception
+    ) -> None:
+        fake = use(monkeypatch, FakeCloud())
+        answer = fake.request
+
+        def request(method: str, url: str, **kwargs: Any) -> httpx.Response:
+            if url.endswith("/api/v1/apps/configure"):
+                raise failure
+            return answer(method, url, **kwargs)
+
+        fake.request = request  # type: ignore[method-assign]
+        result = invoke("deploy")
+        assert result.exit_code == 1
+        assert fake.stopped == [UID]
+        text = plain(result.output)
+        assert f"was not configured on {UID}" in text
+        assert f"The runtime {UID} was stopped." in text
+
+    def test_an_answer_that_is_not_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        fake = use(monkeypatch, FakeCloud(configure=httpx.Response(200, text="<html>")))
+        result = invoke("deploy")
+        assert result.exit_code == 1
+        assert fake.stopped == [UID]
+
+    def test_a_runtime_whose_address_cannot_be_read(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        fake = use(monkeypatch, FakeCloud())
+
+        def base(runtime: Any) -> str:
+            raise ValueError("no ingress")
+
+        fake.base = base  # type: ignore[method-assign]
+        result = invoke("deploy")
+        assert result.exit_code == 1
+        assert fake.stopped == [UID]
+
+    def test_a_reused_runtime_is_left_running_and_the_failure_said(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        fake = use(
+            monkeypatch, FakeCloud(running=[a_runtime()], configure=httpx.Response(200, text="x"))
+        )
+        result = invoke("deploy")
+        assert result.exit_code == 1
+        assert fake.stopped == []
+        assert f"was not configured on {UID}" in plain(result.output)
+
+
+class TestUnmetered:
+    """With DATALAYER_MAGIC_API_KEY set, a launch is free and never expires."""
+
+    @pytest.fixture
+    def magic(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(demo.MAGIC_API_KEY_ENV, "the-magic-key-of-these-tests")
+
+    def test_no_credit_is_asked(self, magic: None, monkeypatch: pytest.MonkeyPatch) -> None:
+        fake = use(monkeypatch, FakeCloud(left=0.0))
+        result = invoke("deploy", "--dry-run")
+        assert result.exit_code == 0, result.output
+        text = plain(result.output)
+        assert "unmetered (no credits, never expires)" in text
+        assert "unmetered: yes" in text
+        assert "the-magic-key-of-these-tests" not in text
+        assert fake.created == []
+
+    def test_a_dry_run_in_json_says_it(self, magic: None, cloud: FakeCloud) -> None:
+        payload = json.loads(invoke("deploy", "--dry-run", "-o", "json").output)
+        [row] = payload["members"]
+        assert row["unmetered"] is True
+        assert row["maxCredits"] == 0.0 and row["minutes"] is None
+        assert "the-magic-key-of-these-tests" not in json.dumps(payload)
+
+    def test_a_metered_dry_run_says_so(self, cloud: FakeCloud) -> None:
+        assert "unmetered: no" in plain(invoke("deploy", "--dry-run").output)
+
+    def test_status_says_never(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        use(
+            monkeypatch,
+            FakeCloud(
+                running=[Runtime(**{**vars(a_runtime()), "unmetered": True, "expired_at": ""})]
+            ),
+        )
+        result = invoke("status")
+        assert result.exit_code == 0, result.output
+        assert "never" in plain(result.output)
+        payload = json.loads(invoke("status", "-o", "json").output)
+        accounting = next(row for row in payload["members"] if row["member"] == "accounting")
+        assert accounting["unmetered"] is True and accounting["minutesLeft"] is None
+
+    def test_a_runtime_launched_metered_is_stopped(
+        self, magic: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A Datalayer that does not take the key yet launches it metered: given back."""
+        stopped: list[str] = []
+        client = SimpleNamespace(
+            create_runtime=lambda **kwargs: a_runtime(),
+            stop_runtime=lambda uid: stopped.append(uid) or True,
+        )
+        launch = SimpleNamespace(
+            make_client=lambda: (client, "tok"),
+            NotSignedIn=type("NotSignedIn", (Exception,), {}),
+        )
+        monkeypatch.setattr(demo, "_launch", lambda: launch)
+        with pytest.raises(demo.OrchestrationCommandError, match=r"launched .* metered"):
+            demo.Cloud().create(NAME, ENVIRONMENT, 60)
+        assert stopped == [UID]
+
+    def test_a_runtime_launched_unmetered_is_kept(
+        self, magic: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        client = SimpleNamespace(
+            create_runtime=lambda **kwargs: Runtime(**{**vars(a_runtime()), "unmetered": True}),
+        )
+        launch = SimpleNamespace(
+            make_client=lambda: (client, "tok"),
+            NotSignedIn=type("NotSignedIn", (Exception,), {}),
+        )
+        monkeypatch.setattr(demo, "_launch", lambda: launch)
+        assert demo.Cloud().create(NAME, ENVIRONMENT, 60).unmetered is True
 
 
 def _has_agentspecs_team() -> bool:
