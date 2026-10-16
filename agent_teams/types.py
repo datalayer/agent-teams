@@ -16,7 +16,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -197,6 +197,32 @@ class AgentMemberConfig(BaseModel):
     approval: ApprovalPolicy = ApprovalPolicy.AUTO
     system_prompt: str = ""
     max_concurrent_tasks: int = Field(default=1, ge=1)
+    #: A coding agent of the catalogue (Claude Code, Codex, …) run behind the
+    #: Shield instead of a model with a prompt (SHIELD SH-45): its tools are its
+    #: own, decided by the Shield's policy, never this member's.
+    harness: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _a_harness_is_the_agent_itself(self) -> AgentMemberConfig:
+        if self.harness:
+            given = [
+                name
+                for name, value in (
+                    ("agent_endpoint", self.agent_endpoint),
+                    ("agent_spec_id", self.agent_spec_id),
+                    ("mcp_server", self.mcp_server),
+                    ("tools", self.tools),
+                    ("system_prompt", self.system_prompt),
+                )
+                if value
+            ]
+            if given:
+                raise ValueError(
+                    f"{self.name} is the coding agent {self.harness!r}, run behind the Shield: "
+                    f"it takes no {', '.join(given)} "
+                    "(the agent brings its own, and the Shield decides them)"
+                )
+        return self
 
 
 class AgentMemberState(BaseModel):

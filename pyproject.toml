@@ -57,6 +57,11 @@ a2a = [
 mcp = [
     "mcp[cli]>=2.0",
 ]
+# A team member that is a coding agent (Claude Code, Codex, …) runs behind
+# the Shield over the Agent Client Protocol (`agent_teams.harness`, SHIELD SH-45).
+shield = [
+    "datalayer-agent-shield>=0.2.2,<0.3",
+]
 # The teams run on Datalayer (`agent-teams list|start|runs|status|…`) and the
 # reactor extension that makes them `datalayer agent-teams`. Not a dependency
 # of the library: the Datalayer CLI that hosts the group always has it.

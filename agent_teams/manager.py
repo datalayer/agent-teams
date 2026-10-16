@@ -114,6 +114,7 @@ class TeamManager:
         artifact_store: ArtifactStore | None = None,
         member_run_factory: MemberRunFactory | None = None,
         health_config: HealthConfig | None = None,
+        harness_run_factory: MemberRunFactory | None = None,
     ) -> None:
         self._teams: dict[str, TeamState] = {}
         self._orchestrators: dict[str, BaseOrchestrator] = {}
@@ -121,6 +122,9 @@ class TeamManager:
         self._channel = channel or InMemoryChannel()
         self._artifact_store = artifact_store or InMemoryArtifactStore()
         self._member_run_factory = member_run_factory
+        # A member that is a coding agent runs behind the Shield (SHIELD SH-45):
+        # `agent_teams.harness.harness_run_factory`, never the model factory.
+        self._harness_run_factory = harness_run_factory
         self._execution_tasks: dict[str, asyncio.Task] = {}
         # fasta2a A2A components (created per-team when protocol is A2A)
         self._a2a_brokers: dict[str, Any] = {}
@@ -206,6 +210,13 @@ class TeamManager:
         team = self._get_team(team_id)
         if team.status not in (TeamStatus.DRAFT, TeamStatus.STOPPED, TeamStatus.PAUSED):
             raise ValueError(f"Cannot start team in {team.status} state")
+        for member_config in team.config.members:
+            if member_config.harness and self._harness_run_factory is None:
+                raise ValueError(
+                    f"{member_config.name} is the coding agent {member_config.harness!r}: "
+                    "a team with a harness member is started by a manager given "
+                    "`harness_run_factory` (agent_teams.harness), which runs it behind the Shield"
+                )
 
         team.status = TeamStatus.STARTING
         team.started_at = datetime.utcnow()
@@ -239,7 +250,9 @@ class TeamManager:
                 )
 
             run_fn = None
-            if use_a2a and member_config.agent_endpoint:
+            if member_config.harness and self._harness_run_factory is not None:
+                run_fn = self._harness_run_factory(member_config)
+            elif use_a2a and member_config.agent_endpoint:
                 # Remote A2A agent — create A2A client run function
                 run_fn = self._create_a2a_run_fn(member_config)
             elif self._member_run_factory:
