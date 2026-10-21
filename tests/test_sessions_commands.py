@@ -302,9 +302,12 @@ def test_swap_refuses_a_running_seat_a_seat_without_a_session_and_an_unknown_sea
     assert "Seat reviewer is answering its task: swap it when the task is over, or interrupt it first." in plain(running.output)
     nobody = World(root_state=ExecutionState.RUNNING, reviewer_session=None)
     monkeypatch.setattr(sessions_commands, "client", lambda: nobody)
-    kept_none = invoke("swap", ROOT, "--seat", "reviewer", "--agent", "shield-mvp-claude-code")
-    assert kept_none.exit_code != 0
-    assert "Seat reviewer's session is not the run's: it kept none" in plain(kept_none.output)
+    # A seat this view sees no session for is the control plane's to judge
+    # (a run opened from a team session carries its seats' sessions on its
+    # root): asked, never refused here.
+    asked_anyway = invoke("swap", ROOT, "--seat", "reviewer", "--agent", "shield-mvp-claude-code")
+    assert asked_anyway.exit_code == 0, asked_anyway.output
+    nobody.recorded["swapped"].clear()
     unknown = invoke("swap", ROOT, "--seat", "tester", "--agent", "x")
     assert unknown.exit_code != 0 and "has no seat 'tester': one of coder, reviewer" in plain(unknown.output)
     same = invoke("swap", ROOT, "--seat", "coder", "--agent", "shield-mvp-claude-code")

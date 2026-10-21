@@ -710,7 +710,10 @@ def swap(
         raise OrchestrationCommandError(
             f"Team session {execution_id} ended: clone it to go on from it, then swap the clone's seat."
         )
-    if not place.get("session_uid"):
+    # On the platform the control plane decides: a run opened from a team
+    # session (a clone's, an import's) carries its seats' sessions on its
+    # root before any seat's task answers one, which this view does not read.
+    if local and not place.get("session_uid"):
         raise OrchestrationCommandError(
             f"Seat {seat}'s session is not the run's: it kept none (a remote worker's session is its own); "
             "only a harness or a model seat is swapped."
