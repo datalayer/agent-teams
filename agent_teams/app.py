@@ -20,12 +20,15 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from reactor import PluginManifest, hookimpl
 
 from .manager import TeamManager
+from .plugins.host import teams_platform
+from .plugins.points import MEMBER_RUNNERS, MemberRunner
 from .routes.events import router as events_router
 from .routes.teams import router as teams_router
 
@@ -51,6 +54,43 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("agent-teams: shut down")
 
 
+STUB_PLUGIN = "agent-teams.stub-model"
+
+
+def _stub_factory(config: Any) -> Any:
+    """A model member that runs nothing: what the app serves until a host contributes a runner."""
+
+    async def _stub_run(prompt: str, context: dict | None = None) -> str:
+        raise NotImplementedError(
+            f"No agent runtime is contributed for member {config.name!r}: "
+            "contribute a teams.member.runner for 'model' (teams_platform(model=…)) "
+            "to the platform the TeamManager reads."
+        )
+
+    return _stub_run
+
+
+class StubModelPlugin:
+    """Contributes the stub as the ``model`` runner (MH-F07): a test plugin, by name."""
+
+    @hookimpl
+    def provide_contributions(self, contributions: Any) -> None:
+        contributions.contribute(MEMBER_RUNNERS, MemberRunner("model", _stub_factory), contribution_id="model")
+
+
+def stub_plugin() -> tuple[PluginManifest, StubModelPlugin]:
+    """The stub model runner, as a plugin a platform registers beside the built-ins."""
+    return (
+        PluginManifest(
+            name=STUB_PLUGIN,
+            version="0.0.0",
+            description="A model member that runs nothing, for a server nobody gave a runner.",
+            tags=["agent-teams", "test"],
+        ),
+        StubModelPlugin(),
+    )
+
+
 def create_app(
     *,
     manager: TeamManager | None = None,
@@ -62,23 +102,15 @@ def create_app(
     ----------
     manager:
         An existing :class:`TeamManager` to use.  When *None* a new one
-        is created with a default ``member_run_factory`` that raises
-        ``NotImplementedError`` (fine for testing, not for production).
+        is made on a platform whose ``model`` runner is this module's stub
+        (:func:`stub_plugin`): a model member's task raises
+        ``NotImplementedError`` naming what to contribute — fine for
+        testing, not for production.
     cors_origins:
         Allowed CORS origins.  Defaults to ``["*"]`` in development.
     """
     if manager is None:
-
-        def _stub_factory(config):
-            async def _stub_run(prompt: str, context: dict | None = None) -> str:
-                raise NotImplementedError(
-                    f"No agent runtime configured for member {config.name!r}. "
-                    "Provide a real member_run_factory when creating the TeamManager."
-                )
-
-            return _stub_run
-
-        manager = TeamManager(member_run_factory=_stub_factory)
+        manager = TeamManager(platform=teams_platform(plugins=[stub_plugin()]))
 
     app = FastAPI(
         title="Datalayer Agent Teams",

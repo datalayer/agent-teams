@@ -356,6 +356,11 @@ class TeamState(BaseModel):
     # Activity log
     events: list[TeamEvent] = Field(default_factory=list)
 
+    #: The run as a team session (MH-23): its execution id, state, the seats
+    #: with their sessions (`agent_teams.sessions.SeatSessions.row()`); the
+    #: `given` seat uids a resumed, cloned or imported team session comes with.
+    session: dict[str, Any] = Field(default_factory=dict)
+
 
 class TeamEvent(BaseModel):
     """An event in the team's activity timeline."""
