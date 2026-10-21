@@ -1,0 +1,56 @@
+---
+title: Resume and end
+---
+
+# Resume and end a team session
+
+## `agent-teams sessions resume`
+
+Lets a paused run go on: the run, and each seat's session with it. On
+Datalayer this is `executions.resume`; the seat's next task is handed its
+session, so the seat's worker resumes rather than opens.
+
+```text
+$ agent-teams sessions resume exec_8f1c…
+Received, and the team goes on: each seat's session with it.
+```
+
+Refused in a sentence:
+
+- an ended run — *Team session X ended; an ended run is not resumed — clone it
+  to go on from it (`agent-teams sessions clone`).*
+- a run that is open — *Team session X is open, not paused.*
+- a team session that has no run yet (a clone, an import) is not refused: it
+  gets its run (below).
+- with `--local`, a self-hosted server's run — *resume its run there
+  (`agent-teams local resume <team>`); its seats' sessions go on with it.*
+
+### A clone or an import gets its run
+
+A team session kept as a file — a clone, an import — has no run yet. Resuming
+it opens one: a new root execution of the team through the control plane's
+`executions.from-session`, carrying each seat's session uid, so each seat goes
+on from its session at its first task. The goal is `--goal`, else the kept
+title; none is refused (*has no goal to run on: say one with `--goal`*). The
+file then names the run (`run_execution_id`), and resuming it again is refused
+naming that run.
+
+```text
+$ agent-teams sessions resume team-session-3fa2… --goal "Go on with the review"
+Opened run exec_9b7d… from team session team-session-3fa2…: each seat goes on
+from its session (coder: 01m5…, reviewer: 01m6…).
+```
+
+## `agent-teams sessions end`
+
+Ends a run for good: on Datalayer the run is terminated and its seats'
+sessions end with it — each gets an `ended` entry in its record, by `run`. A
+team session kept as a file (a clone, an import, a self-hosted run) is ended
+in its file, and with `--local` each seat's session too.
+
+```text
+$ agent-teams sessions end exec_8f1c…
+Received, and the run is being ended: its seats' sessions end with it.
+$ agent-teams sessions end exec_8f1c…
+Team session exec_8f1c… ended already.
+```

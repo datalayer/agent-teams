@@ -19,6 +19,14 @@ plane (``agent_teams.platform_cli``, needs ``agent-teams[datalayer]``)::
     agent-teams status <run>
     agent-teams monitor | steer | pause | resume | cancel | terminate | artifacts <run>
 
+The landing's demo team on Datalayer, under your account (``agent_teams.demo_cli``,
+needs ``agent-teams[demo]``)::
+
+    agent-teams demo deploy [--dry-run]
+    agent-teams demo status
+    agent-teams demo url
+    agent-teams demo stop
+
 A self-hosted agent-teams server, and the teams it holds::
 
     agent-teams serve --port 8765

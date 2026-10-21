@@ -22,7 +22,7 @@ answers.
 The published, normative specification, with the schema this module's shape
 is checked against, is at
 ``research/orchestration-protocols/docs/extension-v1.md`` in the Datalayer
-monorepo (`datalayer/ui`) — this package is the extension's implementation,
+web client — this package is the extension's implementation,
 not a copy of the spec, so a change to one is read against the other by the
 tests that exercise a real delegation built from this module's own
 functions (``test_orchestration_extension.py``).

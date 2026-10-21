@@ -112,7 +112,8 @@ class SequentialOrchestrator(BaseOrchestrator):
         task: TaskDefinition,
         max_retries: int,
     ) -> TaskResult:
-        """Execute a single task with retries."""
+        """Execute a single task with retries; a task that fails every attempt answers its last failure, in its sentence."""
+        last: Optional[TaskResult] = None
         for attempt in range(max_retries + 1):
             idle = self.ctx.get_idle_members()
             if not idle:
@@ -165,14 +166,15 @@ class SequentialOrchestrator(BaseOrchestrator):
                 )
                 member.state.status = MemberStatus.IDLE
                 member.state.current_task_id = None
+                last = result
 
                 if attempt == max_retries:
                     return result
 
-        # Should not reach here
-        return TaskResult(
+        # Every attempt failed, or none could claim the task: the last failure says why.
+        return last or TaskResult(
             task_id=task.id,
             member_id="",
             status=TaskStatus.FAILED,
-            error="Exhausted all retries",
+            error=f"Task {task.id} could not be claimed by any member in {max_retries + 1} attempts",
         )
