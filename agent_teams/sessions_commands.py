@@ -757,7 +757,13 @@ def swap(
         f"Seat {seat} swapped to {answer.get('toAgent') or agent} {where}"
         + (f" (session {answer['sessionUid']})" if answer.get("sessionUid") else "")
         + f": {answer.get('said') or 'no sentence answered'}"
-        + (" The supervisor was told." if answer.get("steered") else " The supervisor was not told; steer it with `agent-teams steer`."),
+        + (
+            " The supervisor was told."
+            if answer.get("steered")
+            else " The supervisor waits on its members: it is told in its brief when it is asked."
+            if answer.get("briefed")
+            else " The supervisor was not told; steer it with `agent-teams steer`."
+        ),
         markup=False,
         highlight=False,
     )
