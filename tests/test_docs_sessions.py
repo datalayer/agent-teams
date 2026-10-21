@@ -25,7 +25,9 @@ DOCS = Path(__file__).resolve().parents[1] / "docs" / "docs" / "sessions"
 
 
 def _verbs() -> list[str]:
-    result = CliRunner(env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"}).invoke(app, ["sessions", "--help"])
+    result = CliRunner(env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"}).invoke(
+        app, ["sessions", "--help"]
+    )
     assert result.exit_code == 0, result.output
     text = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
     commands = text.split("Commands")[-1]
@@ -39,7 +41,9 @@ def test_every_sessions_verb_has_a_page_section() -> None:
     assert pages, "the Sessions section has pages"
     for verb in verbs:
         heading = f"## `agent-teams sessions {verb}`"
-        assert any(heading in text for text in pages.values()), f"no page section for `agent-teams sessions {verb}`"
+        assert any(heading in text for text in pages.values()), (
+            f"no page section for `agent-teams sessions {verb}`"
+        )
 
 
 def test_the_cli_reference_names_the_group_and_nothing_private_is_named() -> None:
@@ -48,3 +52,39 @@ def test_the_cli_reference_names_the_group_and_nothing_private_is_named() -> Non
     for page in [*DOCS.glob("*.mdx"), DOCS.parent / "cli" / "index.mdx"]:
         text = page.read_text(encoding="utf-8")
         assert "plans/" not in text and "datalayer/ui" not in text, page
+
+
+REPO = DOCS.parents[2]
+
+
+def test_nothing_public_names_a_private_plan_or_the_private_web_client() -> None:
+    """Every page, the README, the changelog and the package's own docstrings say the
+    seam with the platform in public words: never a private plan (`plans/`) or the
+    private web client's repository (`datalayer/ui`)."""
+    files = [
+        REPO / "README.md",
+        REPO / "CHANGELOG.md",
+        *(REPO / "docs" / "docs").rglob("*.mdx"),
+        *(REPO / "agent_teams").rglob("*.py"),
+    ]
+    named = []
+    for path in files:
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for word in ("plans/", "datalayer/ui"):
+            if word in text:
+                named.append(f"{path.relative_to(REPO)}: {word!r}")
+    assert not named, "named where nothing private may be: " + ", ".join(named)
+
+
+def test_the_readme_says_the_platform_extras_and_the_seam() -> None:
+    readme = (REPO / "README.md").read_text(encoding="utf-8")
+    for words in (
+        "agent-teams[datalayer]",
+        "agent-teams[shield]",
+        "DATALAYER_AI_AGENTS_URL",
+        "DATALAYER_API_KEY",
+        "--local",
+    ):
+        assert words in readme, words

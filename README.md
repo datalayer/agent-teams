@@ -34,6 +34,26 @@ runtime is launched unmetered: no credits, and it never expires; `--dry-run`
 says `unmetered: yes` and `status` shows `never` for the time left. See the
 [CLI reference](docs/docs/cli/index.mdx#the-demo-team).
 
+## Running on Datalayer, and on your own
+
+The library runs a team on its own: `TeamManager`, the local orchestrators
+and the file stores need no platform. Two extras turn the platform on:
+
+- `pip install "agent-teams[datalayer]"` — the `datalayer agent-teams …`
+  group of the Datalayer CLI (`list|start|runs|status|steer|sessions …`),
+  which talks to the control plane with your login (`datalayer login`, or
+  `DATALAYER_API_KEY`); `agent-teams sessions …` reads and writes the seats'
+  sessions in the platform's record when `DATALAYER_AI_AGENTS_URL` or
+  `DATALAYER_API_KEY` is set, and `--local` reads a self-hosted server's files
+  (`AGENT_TEAMS_SESSIONS_PATH`, `AGENT_RUNTIMES_SESSIONS_PATH`) instead.
+- `pip install "agent-teams[shield]"` — a coding agent (Claude Code, Codex,
+  …) as a team member, run behind the Shield.
+
+Nothing in this package is private to Datalayer: the control plane's routes
+it calls are the [orchestration API](https://datalayer.ai/extensions/orchestration/v1)
+and ai-agents' session routes, and a self-hosted agent-runtimes server
+answers the same verbs on its own files.
+
 ## The Datalayer orchestration extension
 
 `agent_teams.a2a` (Python) and `@datalayer/agent-teams` (TypeScript)
