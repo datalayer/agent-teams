@@ -205,3 +205,4 @@ ignore = [
 "agent_teams/cli.py" = ["B008", "UP045"]
 "agent_teams/platform_cli.py" = ["B008", "UP045"]
 "agent_teams/demo_cli.py" = ["B008", "UP045"]
+"agent_teams/sessions_commands.py" = ["B008", "UP045"]

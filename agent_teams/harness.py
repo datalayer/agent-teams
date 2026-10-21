@@ -30,7 +30,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .plugins.points import MemberRunner, RunFn
 from .sessions.seats import SESSION_CONTEXT
@@ -126,7 +126,7 @@ class HarnessRunner:
     shield: Sequence[str] | None = None
     env: Mapping[str, str] | None = None
     store: FileSessionStore = field(default_factory=FileSessionStore)
-    _held: Dict[str, _Held] = field(default_factory=dict, init=False)
+    _held: dict[str, _Held] = field(default_factory=dict, init=False)
 
     @property
     def root(self) -> Path:
@@ -139,7 +139,9 @@ class HarnessRunner:
     def _argv(self, member: AgentMemberConfig) -> list[str]:
         if not member.harness:
             raise HarnessRefusedError(f"{member.name} is not a harness member")
-        command = list((self.commands or {}).get(member.harness) or catalogue_command(member.harness))
+        command = list(
+            (self.commands or {}).get(member.harness) or catalogue_command(member.harness)
+        )
         starter = list(self.shield) if self.shield else [sys.executable, "-m", "agent_shield.cli"]
         return [
             *starter,
@@ -197,7 +199,7 @@ class HarnessRunner:
             raise HarnessRefusedError(f"{member.name} is not a harness member")
         self._argv(member)  # refused now, in the register's sentence, not at the first task
 
-        async def run(prompt: str, context: Dict[str, Any]) -> str:
+        async def run(prompt: str, context: dict[str, Any]) -> str:
             from acp import text_block
 
             session_uid = str((context or {}).get(SESSION_CONTEXT, {}).get("uid") or "")
@@ -215,7 +217,9 @@ class HarnessRunner:
                 answer = f"{held.said_first}\n\n{answer}" if answer else held.said_first
                 held.said_first = ""
             if held.seen.refused:
-                answer += "\n\nRefused, nobody being there to ask: " + "; ".join(held.seen.refused) + "."
+                answer += (
+                    "\n\nRefused, nobody being there to ask: " + "; ".join(held.seen.refused) + "."
+                )
             if turn.stop_reason not in ("end_turn", "max_tokens", "max_turn_requests"):
                 raise HarnessRefusedError(
                     f"{member.name}'s turn ended {turn.stop_reason}: {answer or 'nothing said'}"
@@ -224,7 +228,7 @@ class HarnessRunner:
 
         return run
 
-    def session_of(self, member_id: str) -> Optional[str]:
+    def session_of(self, member_id: str) -> str | None:
         """The ACP session id a member's run holds, or ``None``."""
         held = self._held.get(member_id)
         return held.acp_session_id if held is not None else None

@@ -25,13 +25,15 @@ open, paused or ended is refused in a sentence.
 
 from __future__ import annotations
 
+import builtins
 import json
 import os
 import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any
 
 #: The root agent-runtimes' file session store reads too.
 SESSIONS_PATH_VARIABLE = "AGENT_RUNTIMES_SESSIONS_PATH"
@@ -46,7 +48,7 @@ HARNESS_FILE = "harness_session.json"
 SESSION_STATES = ("open", "paused", "ended")
 
 
-class SessionRefused(Exception):
+class SessionRefused(Exception):  # noqa: N818 - agent-runtimes' name
     """An operation on a session refused: its status and its reason, in a sentence."""
 
     def __init__(self, status: int, reason: str):
@@ -73,7 +75,7 @@ def check_state(word: str) -> str:
     return word
 
 
-def describe_session(uid: str, entries: Sequence[Mapping[str, Any]]) -> Optional[Dict[str, Any]]:
+def describe_session(uid: str, entries: Sequence[Mapping[str, Any]]) -> dict[str, Any] | None:  # noqa: C901
     """A session as the record says it (§2 of the session model), from its
     entries in order — the row ``GET /sessions`` lists: ``None`` when the
     entries hold no ``session`` entry (never a default).
@@ -88,7 +90,7 @@ def describe_session(uid: str, entries: Sequence[Mapping[str, Any]]) -> Optional
         return None
     payload = dict(opened.get("payload") or {})
     lineage = dict(payload.get("lineage") or {"forked_from": None, "imported_from": None})
-    described: Dict[str, Any] = {
+    described: dict[str, Any] = {
         "uid": uid,
         "agent": str(payload.get("agent") or ""),
         "harness": payload.get("harness") or None,
@@ -116,7 +118,9 @@ def describe_session(uid: str, entries: Sequence[Mapping[str, Any]]) -> Optional
         elif kind == "turn":
             described["turns"] += 1
         elif kind == "swapped":
-            described["agent"] = str(payload.get("agent") or payload.get("to") or described["agent"])
+            described["agent"] = str(
+                payload.get("agent") or payload.get("to") or described["agent"]
+            )
             described["harness"] = payload.get("harness") or payload.get("to_harness")
         elif kind == "titled":
             described["title"] = str(payload.get("title") or "")[:200]
@@ -124,7 +128,10 @@ def describe_session(uid: str, entries: Sequence[Mapping[str, Any]]) -> Optional
         elif kind == "cloned" and payload.get("from"):
             described["lineage"] = {
                 **described["lineage"],
-                "forked_from": {"uid": str(payload["from"]), "at_turn": int(payload.get("at_turn") or 0)},
+                "forked_from": {
+                    "uid": str(payload["from"]),
+                    "at_turn": int(payload.get("at_turn") or 0),
+                },
             }
         elif kind == "imported":
             described["lineage"] = {
@@ -141,7 +148,9 @@ def describe_session(uid: str, entries: Sequence[Mapping[str, Any]]) -> Optional
     return described
 
 
-def entries_up_to_turn(entries: Sequence[Mapping[str, Any]], up_to_turn: Optional[int]) -> List[Dict[str, Any]]:
+def entries_up_to_turn(
+    entries: Sequence[Mapping[str, Any]], up_to_turn: int | None
+) -> list[dict[str, Any]]:
     """The entries up to and including the ``up_to_turn``-th turn; all when none is named.
 
     Raises
@@ -156,7 +165,7 @@ def entries_up_to_turn(entries: Sequence[Mapping[str, Any]], up_to_turn: Optiona
         raise SessionRefused(
             422, f"The session has {turns} turns; there is no turn {up_to_turn} to cut it at."
         )
-    kept: List[Dict[str, Any]] = []
+    kept: list[dict[str, Any]] = []
     seen = 0
     for entry in entries:
         kept.append(dict(entry))
@@ -183,13 +192,13 @@ class FileSessionStore:
     def exists(self, uid: str) -> bool:
         return (self._folder(uid) / ENTRIES_FILE).is_file()
 
-    def entries(self, uid: str) -> List[Dict[str, Any]]:
+    def entries(self, uid: str) -> list[dict[str, Any]]:
         path = self._folder(uid) / ENTRIES_FILE
         if not path.is_file():
             return []
         return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
-    def describe(self, uid: str) -> Optional[Dict[str, Any]]:
+    def describe(self, uid: str) -> dict[str, Any] | None:
         return describe_session(uid, self.entries(uid))
 
     def append(
@@ -221,15 +230,17 @@ class FileSessionStore:
                 }
                 out.write(json.dumps(line, default=str) + "\n")
 
-    def copy(self, uid: str, to_uid: str, *, up_to_turn: Optional[int] = None) -> int:
+    def copy(self, uid: str, to_uid: str, *, up_to_turn: int | None = None) -> int:
         """Copy a session's entries under a new uid, up to a turn; how many went."""
         if self.exists(to_uid):
-            raise SessionRefused(409, f"There is a session {to_uid} already: a clone takes a new uid.")
+            raise SessionRefused(
+                409, f"There is a session {to_uid} already: a clone takes a new uid."
+            )
         kept = entries_up_to_turn(self.entries(uid), up_to_turn)
         self.append(to_uid, [{**e, "session_uid": to_uid} for e in kept])
         return len(kept)
 
-    def harness_session(self, uid: str) -> Optional[Dict[str, Any]]:
+    def harness_session(self, uid: str) -> dict[str, Any] | None:
         """A harness seat's own session beside the entries, or ``None``."""
         path = self._folder(uid) / HARNESS_FILE
         return json.loads(path.read_text()) if path.is_file() else None
@@ -253,7 +264,7 @@ class TeamSessionStore:
     def _file(self, execution_id: str) -> Path:
         return self.root / f"{execution_id}.json"
 
-    def get(self, execution_id: str) -> Optional[Dict[str, Any]]:
+    def get(self, execution_id: str) -> dict[str, Any] | None:
         path = self._file(execution_id)
         return json.loads(path.read_text()) if path.is_file() else None
 
@@ -263,7 +274,7 @@ class TeamSessionStore:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(dict(row), default=str, indent=2))
 
-    def list(self, *, team: str = "") -> List[Dict[str, Any]]:
+    def list(self, *, team: str = "") -> builtins.list[dict[str, Any]]:
         """Every team session, newest first; one team's when named."""
         if not self.root.is_dir():
             return []

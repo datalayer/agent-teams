@@ -26,8 +26,9 @@ the record and the run is its file.
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Callable
 
 from ..hooks import HookEvent, HookRegistry
 from ..types import AgentMemberConfig
@@ -36,7 +37,7 @@ from .store import FileSessionStore, SessionRefused, TeamSessionStore, new_uid, 
 logger = logging.getLogger(__name__)
 
 #: What a run function is: the prompt and the task's context, the answer.
-RunFn = Callable[[str, Dict[str, Any]], Awaitable[str]]
+RunFn = Callable[[str, dict[str, Any]], Awaitable[str]]
 
 #: What a seat's task is told about its session, under ``context["session"]``.
 SESSION_CONTEXT = "session"
@@ -65,16 +66,21 @@ class SeatSession:
     seat: str
     uid: str
     agent: str
-    harness: Optional[str]
+    harness: str | None
     execution_id: str
     turns: int = 0
     state: str = "open"
 
-    def runs_on(self) -> Dict[str, Any]:
+    def runs_on(self) -> dict[str, Any]:
         return {"kind": "team_run", "execution_id": self.execution_id, "seat": self.seat}
 
-    def row(self) -> Dict[str, Any]:
-        return {"id": self.seat, "session_uid": self.uid, "agent": self.agent, "harness": self.harness}
+    def row(self) -> dict[str, Any]:
+        return {
+            "id": self.seat,
+            "session_uid": self.uid,
+            "agent": self.agent,
+            "harness": self.harness,
+        }
 
 
 @dataclass
@@ -86,18 +92,18 @@ class SeatSessions:
     team_version: str
     owner_uid: str
     members: Sequence[AgentMemberConfig]
-    hooks: Optional[HookRegistry] = None
+    hooks: HookRegistry | None = None
     store: FileSessionStore = field(default_factory=FileSessionStore)
     teams: TeamSessionStore = field(default_factory=TeamSessionStore)
     #: Seat uids a resumed, cloned or imported team session comes with: the
     #: seat's first task resumes that session instead of opening a new one.
     given: Mapping[str, str] = field(default_factory=dict)
     state: str = "open"
-    lineage: Dict[str, Any] = field(
+    lineage: dict[str, Any] = field(
         default_factory=lambda: {"forked_from": None, "imported_from": None}
     )
     title: str = ""
-    _seats: Dict[str, SeatSession] = field(default_factory=dict, init=False)
+    _seats: dict[str, SeatSession] = field(default_factory=dict, init=False)
     _started_at: str = field(default_factory=now, init=False)
 
     # -- the team session's row -------------------------------------------------
@@ -106,13 +112,13 @@ class SeatSessions:
     def app_uid(self) -> str:
         return f"team:{self.team_id}"
 
-    def seat(self, seat_id: str) -> Optional[SeatSession]:
+    def seat(self, seat_id: str) -> SeatSession | None:
         return self._seats.get(seat_id)
 
-    def seats(self) -> List[SeatSession]:
+    def seats(self) -> list[SeatSession]:
         return list(self._seats.values())
 
-    def row(self) -> Dict[str, Any]:
+    def row(self) -> dict[str, Any]:
         """The team session as a row: the run, its seats, its state."""
         return {
             "execution_id": self.execution_id,
@@ -170,7 +176,11 @@ class SeatSessions:
             raise SessionRefused(
                 409,
                 f"Team session {self.execution_id} is {self.state}: "
-                + ("resume it before going on." if self.state == "paused" else "an ended run is not resumed — clone it to go on from it."),
+                + (
+                    "resume it before going on."
+                    if self.state == "paused"
+                    else "an ended run is not resumed — clone it to go on from it."
+                ),
             )
         held = self._seats.get(member.id)
         if held is not None:
@@ -187,7 +197,7 @@ class SeatSessions:
         self.write_row()
         return seat
 
-    def _facts(self, seat: SeatSession, member: AgentMemberConfig) -> Dict[str, Any]:
+    def _facts(self, seat: SeatSession, member: AgentMemberConfig) -> dict[str, Any]:
         return {
             "app": self.app_uid,
             "state": "open",
@@ -246,7 +256,11 @@ class SeatSessions:
                 {
                     "kind": "session",
                     "summary": f"A session of {self.team_id}'s seat {member.id} resumed",
-                    "payload": {**self._facts(seat, member), "resumed": True, "title": described["title"]},
+                    "payload": {
+                        **self._facts(seat, member),
+                        "resumed": True,
+                        "title": described["title"],
+                    },
                 }
             ],
             app_uid=self.app_uid,
@@ -274,7 +288,7 @@ class SeatSessions:
     def wrap(self, member: AgentMemberConfig, run: RunFn) -> RunFn:
         """The member's run function as a turn of its session."""
 
-        async def as_a_turn(prompt: str, context: Dict[str, Any]) -> str:
+        async def as_a_turn(prompt: str, context: dict[str, Any]) -> str:
             seat = await self.open_or_resume(member)
             told = {
                 **(context or {}),
@@ -296,12 +310,20 @@ class SeatSessions:
     async def pause(self) -> None:
         """Pause the run: every seat's session gets its ``paused`` entry."""
         if self.state != "open":
-            raise SessionRefused(409, f"Team session {self.execution_id} is {self.state}, not open.")
+            raise SessionRefused(
+                409, f"Team session {self.execution_id} is {self.state}, not open."
+            )
         for seat in self._seats.values():
             seat.state = "paused"
             self.store.append(
                 seat.uid,
-                [{"kind": "paused", "summary": "Paused with its run", "payload": {"state": "paused"}}],
+                [
+                    {
+                        "kind": "paused",
+                        "summary": "Paused with its run",
+                        "payload": {"state": "paused"},
+                    }
+                ],
                 app_uid=self.app_uid,
                 opened_by=self.owner_uid,
             )
@@ -331,7 +353,13 @@ class SeatSessions:
             seat.state = "ended"
             self.store.append(
                 seat.uid,
-                [{"kind": "ended", "summary": "Ended with its run", "payload": {"state": "ended", "by": "run"}}],
+                [
+                    {
+                        "kind": "ended",
+                        "summary": "Ended with its run",
+                        "payload": {"state": "ended", "by": "run"},
+                    }
+                ],
                 app_uid=self.app_uid,
                 opened_by=self.owner_uid,
             )

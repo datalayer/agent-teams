@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Optional
+from typing import Any
 
 from reactor import ExtensionManifest, PluginManifest, ReactorExtension, hookimpl
 
@@ -62,7 +62,7 @@ def _orchestrations() -> list[Orchestration]:
     ]
 
 
-def harness_from_environment() -> Optional[Any]:
+def harness_from_environment() -> Any | None:
     """The harness runner the environment configures, or ``None`` when it names no workspace."""
     workspace = os.environ.get(WORKSPACE_VARIABLE, "").strip()
     if not workspace:
@@ -75,7 +75,7 @@ def harness_from_environment() -> Optional[Any]:
 class RunsPlugin:
     """Contributes the runners and the orchestrations agent-teams ships."""
 
-    def __init__(self, *, model: Optional[RunFactory] = None, harness: Optional[Any] = None) -> None:
+    def __init__(self, *, model: RunFactory | None = None, harness: Any | None = None) -> None:
         self._model = model
         self._harness = harness
 
@@ -83,7 +83,9 @@ class RunsPlugin:
     def provide_contributions(self, contributions: Any) -> None:
         from .runners import a2a_runner
 
-        contributions.contribute(MEMBER_RUNNERS, a2a_runner(), contribution_id="a2a", order=DEFAULT_ORDER)
+        contributions.contribute(
+            MEMBER_RUNNERS, a2a_runner(), contribution_id="a2a", order=DEFAULT_ORDER
+        )
         harness = self._harness if self._harness is not None else harness_from_environment()
         if harness is not None:
             contributions.contribute(
@@ -102,7 +104,9 @@ class RunsPlugin:
             )
 
 
-def plugin(*, model: Optional[RunFactory] = None, harness: Optional[Any] = None) -> tuple[PluginManifest, RunsPlugin]:
+def plugin(
+    *, model: RunFactory | None = None, harness: Any | None = None
+) -> tuple[PluginManifest, RunsPlugin]:
     """The built-in plugin, as the extension delivers it."""
     return (
         PluginManifest(
@@ -119,7 +123,7 @@ def plugin(*, model: Optional[RunFactory] = None, harness: Optional[Any] = None)
     )
 
 
-def extension(*, model: Optional[RunFactory] = None, harness: Optional[Any] = None) -> ReactorExtension:
+def extension(*, model: RunFactory | None = None, harness: Any | None = None) -> ReactorExtension:
     """The entry point (``datalayer.reactor.extensions``)."""
     return ReactorExtension(
         manifest=ExtensionManifest(

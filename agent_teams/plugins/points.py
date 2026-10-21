@@ -27,39 +27,38 @@ the field (:func:`check`); the host runs with the rest.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Coroutine, Sequence
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable
 
 from reactor import Contribution, ContributionPoint, define_contribution_point
 
 from ..types import AgentMemberConfig
 
 #: What a run function is: the prompt and the task's context, the answer.
-RunFn = Callable[[str, Dict[str, Any]], Coroutine[Any, Any, str]]
+RunFn = Callable[[str, dict[str, Any]], Coroutine[Any, Any, str]]
 
 #: Makes a member's run function from its configuration.
 RunFactory = Callable[[AgentMemberConfig], RunFn]
 
 #: How a seat of one kind runs a task.
-MEMBER_RUNNERS: ContributionPoint["MemberRunner"] = define_contribution_point(
-    "teams.member.runner"
-)
+MEMBER_RUNNERS: ContributionPoint[MemberRunner] = define_contribution_point("teams.member.runner")
 #: How a run coordinates its seats and owns their sessions, per execution mode.
-ORCHESTRATIONS: ContributionPoint["Orchestration"] = define_contribution_point(
+ORCHESTRATIONS: ContributionPoint[Orchestration] = define_contribution_point(
     "teams.session.orchestration"
 )
 
 #: The points, in the order they are listed.
-POINTS: Tuple[ContributionPoint[Any], ...] = (MEMBER_RUNNERS, ORCHESTRATIONS)
+POINTS: tuple[ContributionPoint[Any], ...] = (MEMBER_RUNNERS, ORCHESTRATIONS)
 
 #: The kinds of member a runner is contributed for.
-RUNNER_KINDS: Tuple[str, ...] = ("model", "harness", "a2a")
+RUNNER_KINDS: tuple[str, ...] = ("model", "harness", "a2a")
 
 #: The execution modes an orchestration may be contributed for.
-ORCHESTRATION_MODES: Tuple[str, ...] = ("sequential", "parallel", "supervisor")
+ORCHESTRATION_MODES: tuple[str, ...] = ("sequential", "parallel", "supervisor")
 
 
-class ContributionRefused(ValueError):
+class ContributionRefused(ValueError):  # noqa: N818 - agent-runtimes' name
     """A contribution the point refuses, said in a sentence naming the plugin."""
 
 
@@ -74,7 +73,7 @@ class MemberRunner:
 
     kind: str
     factory: RunFactory
-    end: Optional[Callable[[str], Awaitable[None]]] = None
+    end: Callable[[str], Awaitable[None]] | None = None
 
     @property
     def id(self) -> str:
@@ -130,7 +129,7 @@ def _sentence(contribution: Contribution[Any], point: ContributionPoint[Any], wh
     return f"{contribution.plugin} contributes {point.id} {contribution.id!r} {what}"
 
 
-def _check_one(point: ContributionPoint[Any], contribution: Contribution[Any]) -> None:
+def _check_one(point: ContributionPoint[Any], contribution: Contribution[Any]) -> None:  # noqa: C901
     """Raise :class:`ContributionRefused` when a contribution is not the point's shape."""
     value = contribution.value
     if point is MEMBER_RUNNERS:
@@ -155,14 +154,18 @@ def _check_one(point: ContributionPoint[Any], contribution: Contribution[Any]) -
                 )
             )
         if not callable(value.factory):
-            raise ContributionRefused(_sentence(contribution, point, "without a factory to run with."))
+            raise ContributionRefused(
+                _sentence(contribution, point, "without a factory to run with.")
+            )
         if value.end is not None and not callable(value.end):
             raise ContributionRefused(_sentence(contribution, point, "whose end is not callable."))
         return
     if point is ORCHESTRATIONS:
         if not isinstance(value, Orchestration):
             raise ContributionRefused(
-                _sentence(contribution, point, "that is not an Orchestration (a mode, make and sessions).")
+                _sentence(
+                    contribution, point, "that is not an Orchestration (a mode, make and sessions)."
+                )
             )
         if value.mode not in ORCHESTRATION_MODES:
             raise ContributionRefused(
@@ -189,14 +192,14 @@ def _check_one(point: ContributionPoint[Any], contribution: Contribution[Any]) -
 
 def check(
     point: ContributionPoint[Any], contributions: Sequence[Contribution[Any]]
-) -> Tuple[List[Contribution[Any]], List[Refusal]]:
+) -> tuple[list[Contribution[Any]], list[Refusal]]:
     """The contributions a point accepts, and those it refuses — a malformed
     one, or a second under an id already contributed (the first as the
     registry orders them stands; the built-ins come first at order 0).
     """
-    accepted: List[Contribution[Any]] = []
-    refused: List[Refusal] = []
-    seen: Dict[str, str] = {}
+    accepted: list[Contribution[Any]] = []
+    refused: list[Refusal] = []
+    seen: dict[str, str] = {}
     for contribution in contributions:
         try:
             _check_one(point, contribution)

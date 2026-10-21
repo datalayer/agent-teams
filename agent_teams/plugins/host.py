@@ -21,8 +21,9 @@ sentence that says what to contribute.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable, Mapping
 from importlib.metadata import entry_points
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import Any
 
 from reactor import ContributionPoint, PluginManifest, PluginPlatform
 from reactor.extensions import EXTENSION_ENTRY_POINT_GROUP
@@ -45,17 +46,17 @@ EXTENSION = "agent-teams"
 BUILTIN_PLUGIN = "agent-teams.runs"
 
 #: Entry points that did not resolve, per platform: ``name -> (entry point, error)``.
-_FAILED: Dict[int, Dict[str, Tuple[str, str]]] = {}
+_FAILED: dict[int, dict[str, tuple[str, str]]] = {}
 
 
-def discover(platform: PluginPlatform, group: str = "") -> List[str]:
+def discover(platform: PluginPlatform, group: str = "") -> list[str]:
     """Register every extension installed under ``group`` (the reactor's when
     none is named) that the platform does not hold yet; one that does not load
     is kept as failed with its entry point and error. The names registered.
     """
     group = group or getattr(platform, "extension_group", "") or EXTENSION_ENTRY_POINT_GROUP
     failed = _FAILED.setdefault(id(platform), {})
-    registered: List[str] = []
+    registered: list[str] = []
     held = {entry["name"] for entry in platform.list_extensions()}
     for entry_point in entry_points(group=group):
         try:
@@ -70,27 +71,30 @@ def discover(platform: PluginPlatform, group: str = "") -> List[str]:
             held.add(name)
             registered.append(name)
             failed.pop(entry_point.name, None)
-        except Exception as error:  # noqa: BLE001 - one broken extension is one missing extension
+        except Exception as error:
             reported = f"{type(error).__name__}: {error}"
             if failed.get(entry_point.name) != (entry_point.value, reported):
                 logger.warning(
-                    "Extension %r (%s) could not be loaded: %s", entry_point.name, entry_point.value, reported
+                    "Extension %r (%s) could not be loaded: %s",
+                    entry_point.name,
+                    entry_point.value,
+                    reported,
                 )
             failed[entry_point.name] = (entry_point.value, reported)
     return registered
 
 
-def failed_extensions(platform: PluginPlatform) -> Dict[str, Tuple[str, str]]:
+def failed_extensions(platform: PluginPlatform) -> dict[str, tuple[str, str]]:
     """The entry points that did not resolve on this platform: name -> (entry point, error)."""
     return dict(_FAILED.get(id(platform), {}))
 
 
 def teams_platform(
-    platform: Optional[PluginPlatform] = None,
+    platform: PluginPlatform | None = None,
     *,
-    model: Optional[RunFactory] = None,
-    harness: Optional[Any] = None,
-    plugins: Iterable[Tuple[PluginManifest, Any]] = (),
+    model: RunFactory | None = None,
+    harness: Any | None = None,
+    plugins: Iterable[tuple[PluginManifest, Any]] = (),
     discover_installed: bool = True,
 ) -> PluginPlatform:
     """A platform with the ``agent-teams`` extension on it.
@@ -116,15 +120,15 @@ def teams_platform(
     return platform
 
 
-def accepted(platform: PluginPlatform, point: ContributionPoint[Any]) -> List[Any]:
+def accepted(platform: PluginPlatform, point: ContributionPoint[Any]) -> list[Any]:
     """The contributions of a point the seam accepts, in order."""
     passed, _ = check(point, platform.get_contributions(point))
     return passed
 
 
-def refusals(platform: PluginPlatform) -> List[Refusal]:
+def refusals(platform: PluginPlatform) -> list[Refusal]:
     """Every contribution refused at the seam, over every point."""
-    refused: List[Refusal] = []
+    refused: list[Refusal] = []
     for point in POINTS:
         refused.extend(check(point, platform.get_contributions(point))[1])
     return refused
@@ -174,7 +178,7 @@ def orchestration_for(platform: PluginPlatform, mode: Any) -> Orchestration:
     )
 
 
-def describe_plugins(platform: PluginPlatform) -> Dict[str, Any]:
+def describe_plugins(platform: PluginPlatform) -> dict[str, Any]:
     """What the host holds: each point's accepted contributions, the refusals, the extensions that did not load."""
     return {
         "points": {

@@ -139,8 +139,13 @@ class Client:
 
     def get_execution(self, execution_id: str, *, account_uid: str | None = None) -> Any:
         return SimpleNamespace(
-            execution=next(one for one in TREE + OTHER if one.execution_id == execution_id)
+            execution=next(one for one in TREE + OTHER if one.execution_id == execution_id),
+            attempts=[],
+            acknowledgements=[],
         )
+
+    #: Where the record is (MH-22): no seat kept a session in these runs.
+    urls = SimpleNamespace(ai_agents_url="https://ai-agents.test")
 
     def pause_execution(self, command: Any, *, account_uid: str | None = None) -> Any:
         RECORDED["paused"] = command

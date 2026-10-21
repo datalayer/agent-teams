@@ -14,7 +14,7 @@ the session verbs (its session is not the run's).
 from __future__ import annotations
 
 import uuid
-from typing import Any, Dict, List
+from typing import Any
 
 from ..types import AgentMemberConfig
 from .points import MemberRunner, RunFn
@@ -24,7 +24,7 @@ def a2a_run_factory(member: AgentMemberConfig) -> RunFn:
     """A run function that sends tasks to the member's A2A endpoint."""
     endpoint = member.agent_endpoint
 
-    async def _a2a_run(prompt: str, context: Dict[str, Any] | None = None) -> str:
+    async def _a2a_run(prompt: str, context: dict[str, Any] | None = None) -> str:
         try:
             from fasta2a.client import A2AClient
             from fasta2a.schema import Message as A2AMessage
@@ -48,7 +48,9 @@ def a2a_run_factory(member: AgentMemberConfig) -> RunFn:
             result = response.get("result")
             if result is None:
                 error = response.get("error", {})
-                raise RuntimeError(f"A2A error from {endpoint}: {error.get('message', 'Unknown error')}")
+                raise RuntimeError(
+                    f"A2A error from {endpoint}: {error.get('message', 'Unknown error')}"
+                )
             # A2A v1: the result names what it is — `{"task": …}` or `{"message": …}`.
             if isinstance(result, dict) and isinstance(result.get("task"), dict):
                 return extract_text_from_a2a_task(result["task"])
@@ -66,11 +68,11 @@ def a2a_runner() -> MemberRunner:
     return MemberRunner("a2a", a2a_run_factory)
 
 
-def extract_text_from_a2a_task(task: Dict[str, Any]) -> str:
+def extract_text_from_a2a_task(task: dict[str, Any]) -> str:
     """Extract text output from an A2A Task response: its artifacts, else its last agent message."""
     artifacts = task.get("artifacts", [])
     if artifacts:
-        texts: List[str] = []
+        texts: list[str] = []
         for art in artifacts:
             for part in art.get("parts", []):
                 if "text" in part:
@@ -84,7 +86,7 @@ def extract_text_from_a2a_task(task: Dict[str, Any]) -> str:
     return ""
 
 
-def extract_text_from_parts(parts: List[Dict[str, Any]]) -> str:
+def extract_text_from_parts(parts: list[dict[str, Any]]) -> str:
     """Extract text from A2A message parts."""
     return "\n".join(part.get("text", "") for part in parts if "text" in part)
 
