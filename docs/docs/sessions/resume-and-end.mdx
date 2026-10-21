@@ -1,0 +1,41 @@
+---
+title: Resume and end
+---
+
+# Resume and end a team session
+
+## `agent-teams sessions resume`
+
+Lets a paused run go on: the run, and each seat's session with it. On
+Datalayer this is `executions.resume`; the seat's next task is handed its
+session, so the seat's worker resumes rather than opens.
+
+```text
+$ agent-teams sessions resume exec_8f1c…
+Received, and the team goes on: each seat's session with it.
+```
+
+Refused in a sentence:
+
+- an ended run — *Team session X ended; an ended run is not resumed — clone it
+  to go on from it (`agent-teams sessions clone`).*
+- a run that is open — *Team session X is open, not paused.*
+- a team session that has no run yet (a clone, an import) — *Team session X
+  has no run yet: delegating a new root execution carrying its seats'
+  sessions is not on the control plane yet.*
+- with `--local`, a self-hosted server's run — *resume its run there
+  (`agent-teams local resume <team>`); its seats' sessions go on with it.*
+
+## `agent-teams sessions end`
+
+Ends a run for good: on Datalayer the run is terminated and its seats'
+sessions end with it — each gets an `ended` entry in its record, by `run`. A
+team session kept as a file (a clone, an import, a self-hosted run) is ended
+in its file, and with `--local` each seat's session too.
+
+```text
+$ agent-teams sessions end exec_8f1c…
+Received, and the run is being ended: its seats' sessions end with it.
+$ agent-teams sessions end exec_8f1c…
+Team session exec_8f1c… ended already.
+```

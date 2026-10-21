@@ -1,0 +1,38 @@
+---
+title: Swap a seat
+---
+
+# Swap a seat's agent
+
+## `agent-teams sessions swap`
+
+```bash
+agent-teams sessions swap <run> --seat <id> --agent <agentspec>
+```
+
+Swaps the seat's session to another agent **in place** — the conversation and
+the files carry, the harness's own state does not — and tells the supervisor
+in a sentence, the way a swap of an agent-runtimes session tells the new agent:
+*This conversation was with Claude Code until turn 4; from here it is with
+Codex. What was said stays; what Claude Code kept for itself waits for a swap
+back.*
+
+What the verb refuses, in a sentence:
+
+| Refusal | The sentence |
+|---|---|
+| The seat's turn runs (409) | *Seat reviewer is answering its task: swap it when the task is over, or interrupt it first.* |
+| The seat's session is not the run's (422) | *Seat reviewer's session is not the run's: it kept none (a remote worker's session is its own); only a harness or a model seat is swapped.* |
+| No such seat | *Team coding-agents has no seat 'tester': one of coder, reviewer.* |
+| The agent already bound | *Seat coder's session is bound to shield-mvp-claude-code already.* |
+| An ended run | *Team session X ended: clone it to go on from it, then swap the clone's seat.* |
+
+## Not built yet
+
+The swap itself runs on the seat's runtime, whose address the record never
+says and the control plane keeps to itself. Until the control plane offers a
+route to swap a seat, the verb checks the above and then says so: *Seat
+coder's session … runs on the control plane's runtime, which this command
+cannot reach: swapping a seat needs a control-plane route (the run's steer is
+`agent-teams steer`); not built yet.* With `--local`, a self-hosted server's
+runner holds the agent's process, and a swap there is not built yet either.

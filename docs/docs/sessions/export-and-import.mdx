@@ -1,0 +1,59 @@
+---
+title: Export and import
+---
+
+# Export and import a team session
+
+A team session travels as a `datalayer-session/1` file — the same JSONL file
+an agent-runtimes session travels as, with a **team line** first: the run, the
+team spec's id and version, the owner, the seats in order with their session
+uids, the lineage. Each seat's session follows it: its session line, then its
+entries, redacted (an `Authorization` header, a credential's shape, a declared
+secret's value, a URL's userinfo, the runtime's addresses) and counted.
+Credentials never travel; a file's bytes never travel.
+
+## `agent-teams sessions export`
+
+```bash
+agent-teams sessions export <run> [--out file]
+```
+
+```text
+$ agent-teams sessions export exec_8f1c… --out before-the-review.team-session.jsonl
+Exported 2 seats, 3 turns, 8 entries, 0 redactions → before-the-review.team-session.jsonl (sha256:…).
+```
+
+Refused in a sentence when a seat kept no session (409): *Team session X
+cannot be exported: its seat reviewer kept no session.* The file needs
+agent-runtimes beside agent-teams (`pip install agent-runtimes`): the format
+is its.
+
+## `agent-teams sessions import`
+
+```bash
+agent-teams sessions import <file>
+```
+
+The inverse: the team line validated against the schema and the catalogue,
+each seat's session read as **untrusted data** (the caps, the kinds the record
+has) and written as a **new** session — a new uid, the importer its author,
+`imported_from` in its lineage, `paused` — and a new team session, `paused`,
+whose seats are those sessions, kept as a team session file.
+
+```text
+$ agent-teams sessions import before-the-review.team-session.jsonl
+Imported as team-session-5e7b… (paused, 2 seats, 0 redactions). Resume it: agent-teams sessions resume team-session-5e7b…
+```
+
+Refused in a sentence:
+
+- a team the catalogue does not have (422) — *No team 'x' is catalogued:
+  `agent-teams list` lists them.*
+- a file whose first line is one session — *import it with `loop sessions
+  import`.*
+- a seat the team does not have, a seat whose session is not in the file, a
+  line that is not JSON, an entry of a kind the record does not have — each
+  named.
+
+Resuming the imported team session into a new run waits on the control plane
+(see [Resume and end](./resume-and-end)).

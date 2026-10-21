@@ -60,6 +60,7 @@ execution, and act on the whole tree through the same implementation as
 | `cancel <run> [--no-cascade]` | Stop the run and, by default, every seat under it; its history is kept |
 | `terminate <run> [--keep-worker]` | End the run for good and release its workers |
 | `artifacts <run>` | What the run produced, with every seat's by default |
+| `sessions list\|show\|resume\|swap\|clone\|export\|import\|end` | A run as a team session owning one session per seat: list, show, resume, swap a seat, clone, export, import, end — see [Sessions](../sessions) |
 
 Every command takes `--account` to act in an organization and `-o json` for a
 machine-readable answer. A mutating command derives its idempotency key from
