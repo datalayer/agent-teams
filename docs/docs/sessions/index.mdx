@@ -78,11 +78,7 @@ run (its agent is …): `agent-teams runs` lists the runs.*
 
 ## What is not built yet
 
-- Resuming a cloned or an imported team session into a **new** run: the
-  control plane does not yet take a delegation that carries seat sessions;
-  `sessions resume` of such a session says so.
-- The **swap** of a seat on Datalayer: the seat's runtime is the control
-  plane's to reach; the verb checks what it can and says what it waits on
-  (see [Swap a seat](./swap)).
 - Forking the seats' **workspaces** with a clone: a clone copies the
   conversations only.
+- The **swap** of a seat with `--local`: a self-hosted server's runner holds
+  the agent's process.

@@ -92,6 +92,9 @@ EXECUTION_TO_SESSION: Mapping[str, str] = {
 #: The ai-agents routes the verbs read and write the record through.
 APPS = "/api/ai-agents/v1/apps"
 
+#: The control plane's routes the verbs open a run from a team session and swap a seat through.
+ORCHESTRATION = "/api/ai-agents/v1/orchestration"
+
 #: The file format a team session travels as.
 FORMAT = "datalayer-session/1"
 
@@ -558,11 +561,16 @@ def show(
 @orchestration_command
 def resume(
     execution_id: str = typer.Argument(..., help="The paused run: its root execution."),
+    goal: Optional[str] = typer.Option(
+        None,
+        "--goal",
+        help="For a cloned or imported team session: the goal its new run works on; the kept title when omitted.",
+    ),
     local: bool = local_option(),
     account: Optional[str] = account_option(),
     output: OutputFormat = output_option(),
 ) -> None:
-    """Let a paused run go on: the run and each seat's session with it."""
+    """Let a paused run go on: the run and each seat's session with it; a clone or an import gets its run."""
     session, record = _session(local, execution_id, account)
     if session["state"] == "ended":
         raise OrchestrationCommandError(
@@ -575,10 +583,8 @@ def resume(
             f"(`agent-teams local resume {session['team']['id']}`); its seats' sessions go on with it."
         )
     if not session.get("execution_state"):
-        raise OrchestrationCommandError(
-            f"Team session {execution_id} has no run yet: delegating a new root execution carrying its seats' "
-            "sessions is not on the control plane yet (its delegate command would need to carry them)."
-        )
+        _resume_as_a_new_run(session, record, execution_id, goal, account, output)
+        return
     if session["state"] == "open":
         raise OrchestrationCommandError(f"Team session {execution_id} is open, not paused.")
     command = ExecutionsResume(
@@ -597,6 +603,88 @@ def resume(
     )
 
 
+def _resume_as_a_new_run(
+    session: Mapping[str, Any],
+    record: Any,
+    execution_id: str,
+    goal: Optional[str],
+    account: Optional[str],
+    output: OutputFormat,
+) -> None:
+    """A cloned or imported team session, kept as a file, gets its run: a new
+    root execution of the team delegated through the control plane's
+    `executions.from-session`, carrying each seat's session uid so the seats go
+    on from them at their first task (MH-39, MH-40). The file then names the run."""
+    if session.get("run_execution_id"):
+        raise OrchestrationCommandError(
+            f"Team session {execution_id} already runs as {session['run_execution_id']}: "
+            f"`agent-teams sessions show {session['run_execution_id']}` follows it."
+        )
+    sessions = {
+        str(one["id"]): str(one["session_uid"]) for one in session["seats"] if one.get("session_uid")
+    }
+    if not sessions:
+        raise OrchestrationCommandError(
+            f"Team session {execution_id} has no seat session to go on from: there is nothing to run."
+        )
+    objective = (goal or "").strip() or str(session.get("title") or "").strip()
+    if not objective:
+        raise OrchestrationCommandError(
+            f"Team session {execution_id} has no goal to run on: say one with `--goal`."
+        )
+    the_client = record.client
+    url = f"{str(the_client.urls.ai_agents_url).rstrip('/')}{ORCHESTRATION}/executions/from-session"
+    if account:
+        url += f"?account_uid={account}"
+    body = {
+        "idempotencyKey": f"team-session:{execution_id}:{uuid.uuid4().hex[:12]}",
+        "team": str(session["team"]["id"]),
+        "objective": {"goal": objective},
+        "sessions": sessions,
+    }
+    response = call(lambda: the_client._fetch(url, method="POST", json=body))
+    if response.status_code >= 400:
+        detail = _detail(response)
+        raise OrchestrationCommandError(
+            f"Team session {execution_id} was not opened as a run ({response.status_code}): {detail}"
+        )
+    answer = response.json()
+    run_id = str((answer.get("execution") or {}).get("executionId") or "")
+    kept = TeamSessionStore().get(execution_id)
+    if kept is not None:
+        TeamSessionStore().put({**kept, "state": "open", "run_execution_id": run_id, "resumed_at": _now()})
+    shown = {
+        "execution_id": execution_id,
+        "run_execution_id": run_id,
+        "state": "open",
+        "sessions": sessions,
+        "dispatched": bool(answer.get("dispatched")),
+        "detail": answer.get("detail"),
+    }
+    if emit(shown, output):
+        return
+    console.print(
+        f"Opened run {run_id} from team session {execution_id}: each seat goes on from its session ("
+        + ", ".join(f"{seat}: {uid}" for seat, uid in sessions.items())
+        + ")."
+        + ("" if answer.get("dispatched") else f" Not dispatched yet: {answer.get('detail') or 'no detail'}."),
+        markup=False,
+        highlight=False,
+    )
+
+
+def _detail(response: Any) -> str:
+    """What a refusal says, whatever shape it came in."""
+    try:
+        body = response.json()
+    except ValueError:
+        return str(getattr(response, "text", "") or "")[:200]
+    detail = body.get("detail") if isinstance(body, dict) else body
+    if isinstance(detail, dict):
+        return str(detail.get("message") or detail)
+    return str(detail)
+
+
 @sessions_app.command("swap")
 @orchestration_command
 def swap(
@@ -610,7 +698,7 @@ def swap(
     output: OutputFormat = output_option(),
 ) -> None:
     """Swap a seat's agent in place and tell the supervisor; refused while the seat's turn runs."""
-    session, _ = _session(local, execution_id, account)
+    session, record = _session(local, execution_id, account)
     place = next((one for one in session["seats"] if one["id"] == seat), None)
     if place is None:
         raise OrchestrationCommandError(
@@ -638,13 +726,40 @@ def swap(
             f"Seat {seat}'s session is a self-hosted server's: its runner holds the agent's process, "
             "and a swap there is not built yet."
         )
-    # The swap itself is MH-06 on the seat's runtime; the record never says a
-    # runtime's address, and the control plane keeps the seat's endpoint to
-    # itself: until it offers a route to swap a seat, the verb says so.
-    raise OrchestrationCommandError(
-        f"Seat {seat}'s session {place['session_uid']} runs on the control plane's runtime, which this command "
-        "cannot reach: swapping a seat needs a control-plane route (the run's steer is `agent-teams steer`); "
-        "not built yet."
+    if not session.get("execution_state"):
+        raise OrchestrationCommandError(
+            f"Team session {execution_id} has no run yet: resume it (`agent-teams sessions resume`), "
+            "then swap the run's seat."
+        )
+    # The swap itself runs where the seat's session is — the control plane
+    # reaches the seat's runtime, or the record — through `executions.swap-seat`
+    # (MH-25, decision V); the supervisor is told in the sentence.
+    the_client = record.client
+    url = f"{str(the_client.urls.ai_agents_url).rstrip('/')}{ORCHESTRATION}/executions/swap-seat"
+    if account:
+        url += f"?account_uid={account}"
+    body = {
+        "idempotencyKey": f"swap:{execution_id}:{seat}:{uuid.uuid4().hex[:12]}",
+        "executionId": execution_id,
+        "seat": seat,
+        "agent": agent,
+    }
+    response = call(lambda: the_client._fetch(url, method="POST", json=body))
+    if response.status_code >= 400:
+        raise OrchestrationCommandError(
+            f"Seat {seat} was not swapped ({response.status_code}): {_detail(response)}"
+        )
+    answer = response.json()
+    if emit(answer, output):
+        return
+    where = "on its runtime" if answer.get("how") == "runtime" else "in the record"
+    console.print(
+        f"Seat {seat} swapped to {answer.get('toAgent') or agent} {where}"
+        + (f" (session {answer['sessionUid']})" if answer.get("sessionUid") else "")
+        + f": {answer.get('said') or 'no sentence answered'}"
+        + (" The supervisor was told." if answer.get("steered") else " The supervisor was not told; steer it with `agent-teams steer`."),
+        markup=False,
+        highlight=False,
     )
 
 

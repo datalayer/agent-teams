@@ -20,11 +20,26 @@ Refused in a sentence:
 - an ended run — *Team session X ended; an ended run is not resumed — clone it
   to go on from it (`agent-teams sessions clone`).*
 - a run that is open — *Team session X is open, not paused.*
-- a team session that has no run yet (a clone, an import) — *Team session X
-  has no run yet: delegating a new root execution carrying its seats'
-  sessions is not on the control plane yet.*
+- a team session that has no run yet (a clone, an import) is not refused: it
+  gets its run (below).
 - with `--local`, a self-hosted server's run — *resume its run there
   (`agent-teams local resume <team>`); its seats' sessions go on with it.*
+
+### A clone or an import gets its run
+
+A team session kept as a file — a clone, an import — has no run yet. Resuming
+it opens one: a new root execution of the team through the control plane's
+`executions.from-session`, carrying each seat's session uid, so each seat goes
+on from its session at its first task. The goal is `--goal`, else the kept
+title; none is refused (*has no goal to run on: say one with `--goal`*). The
+file then names the run (`run_execution_id`), and resuming it again is refused
+naming that run.
+
+```text
+$ agent-teams sessions resume team-session-3fa2… --goal "Go on with the review"
+Opened run exec_9b7d… from team session team-session-3fa2…: each seat goes on
+from its session (coder: 01m5…, reviewer: 01m6…).
+```
 
 ## `agent-teams sessions end`
 

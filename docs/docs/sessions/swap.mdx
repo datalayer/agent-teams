@@ -27,12 +27,27 @@ What the verb refuses, in a sentence:
 | The agent already bound | *Seat coder's session is bound to shield-mvp-claude-code already.* |
 | An ended run | *Team session X ended: clone it to go on from it, then swap the clone's seat.* |
 
-## Not built yet
+## Where the swap happens
 
-The swap itself runs on the seat's runtime, whose address the record never
-says and the control plane keeps to itself. Until the control plane offers a
-route to swap a seat, the verb checks the above and then says so: *Seat
-coder's session … runs on the control plane's runtime, which this command
-cannot reach: swapping a seat needs a control-plane route (the run's steer is
-`agent-teams steer`); not built yet.* With `--local`, a self-hosted server's
-runner holds the agent's process, and a swap there is not built yet either.
+The swap runs where the seat's session is, through the control plane's
+`executions.swap-seat`, which alone reaches the seat's runtime. Between a
+seat's tasks the runtime of its last task has usually ended and the session
+is paused in the record: the `swapped` entry is written there with the
+sentence the new agent is told, and the seat's next task is served from the
+agentspec it was swapped to. When a runtime still holds the session, it is
+swapped in place through the session API. Either way the run carries the
+swap and the supervisor is steered with the sentence, as you; the verb says
+whether it was told:
+
+```text
+$ agent-teams sessions swap exec_8f1c… --seat coder --agent shield-mvp-codex
+Seat coder swapped to shield-mvp-codex in the record (session 01m5…): This
+conversation was with Claude Code until turn 2; from here it is with Codex.
+What was said stays; what Claude Code kept for itself waits for a swap back.
+The supervisor was told.
+```
+
+A cloned or imported team session that has no run yet is resumed first
+(*Team session X has no run yet: resume it, then swap the run's seat*). With
+`--local`, a self-hosted server's runner holds the agent's process, and a swap
+there is not built yet.

@@ -150,7 +150,21 @@ class World:
 
     # -- the record --
     def _fetch(self, url: str, *, method: str = "GET", json: Any = None) -> Response:
-        path = url.split("/api/ai-agents/v1/apps", 1)[1]
+        path = url.split("/api/ai-agents/v1", 1)[1]
+        if method == "POST" and path.startswith("/orchestration/executions/from-session"):
+            self.recorded.setdefault("from_session", []).append(dict(json))
+            if json["team"] != TEAM:
+                return Response(404, {"detail": {"code": "not_found", "message": f"No team '{json['team']}' in the catalogue."}})
+            root = an_execution("exec_new_run", f"team:{TEAM}/supervisor", state=ExecutionState.CREATED, root="exec_new_run")
+            return Response(202, {"success": True, "execution": root.to_wire(), "acknowledgement": {"kind": "received"}, "dispatched": True, "detail": None})
+        if method == "POST" and path.startswith("/orchestration/executions/swap-seat"):
+            self.recorded.setdefault("swapped", []).append(dict(json))
+            return Response(200, {
+                "success": True, "executionId": json["executionId"], "seat": json["seat"], "sessionUid": "sess-coder",
+                "fromAgent": "shield-mvp-claude-code", "toAgent": json["agent"], "atTurn": 2, "how": "record",
+                "said": "This conversation was with Claude Code until turn 2; from here it is with Codex.", "steered": True,
+            })
+        path = path[len("/apps"):] if path.startswith("/apps") else path
         if method == "GET" and path.startswith("/records/sessions/"):
             uid = path[len("/records/sessions/"):].split("?")[0]
             if uid not in self.sessions:
@@ -295,9 +309,13 @@ def test_swap_refuses_a_running_seat_a_seat_without_a_session_and_an_unknown_sea
     assert unknown.exit_code != 0 and "has no seat 'tester': one of coder, reviewer" in plain(unknown.output)
     same = invoke("swap", ROOT, "--seat", "coder", "--agent", "shield-mvp-claude-code")
     assert same.exit_code != 0 and "is bound to shield-mvp-claude-code already" in plain(same.output)
-    # The swap itself waits on a control-plane route to the seat's runtime: said, never pretended.
-    waits = invoke("swap", ROOT, "--seat", "coder", "--agent", "shield-mvp-codex")
-    assert waits.exit_code != 0 and "needs a control-plane route" in plain(waits.output)
+    # The swap itself is the control plane's `executions.swap-seat` (decision V): asked, and its answer said.
+    swapped = invoke("swap", ROOT, "--seat", "coder", "--agent", "shield-mvp-codex")
+    assert swapped.exit_code == 0, swapped.output
+    assert "Seat coder swapped to shield-mvp-codex in the record (session sess-coder): This conversation was with Claude Code until turn 2" in plain(swapped.output)
+    assert "The supervisor was told." in plain(swapped.output)
+    [asked] = nobody.recorded["swapped"]
+    assert (asked["executionId"], asked["seat"], asked["agent"]) == (ROOT, "coder", "shield-mvp-codex") and asked["idempotencyKey"].startswith(f"swap:{ROOT}:coder:")
 
 
 # --- clone (MH-40) -------------------------------------------------------------------------
@@ -387,9 +405,20 @@ def test_import_makes_a_new_paused_team_session_whose_seats_are_new_sessions(wor
     assert coder["entries"][0]["payload"]["runs_on"] == {"kind": "team_run", "execution_id": "", "seat": "coder"}
     assert coder["entries"][-2]["payload"]["source_uid"] == "sess-coder"
     assert TeamSessionStore().get(row["execution_id"])["state"] == "paused"
-    # Resumed: a new root carrying the seats' sessions is not on the control plane yet — said.
-    waits = invoke("resume", row["execution_id"])
-    assert waits.exit_code != 0 and "has no run yet" in plain(waits.output)
+    # Resumed: a new root carrying the seats' sessions, through the control plane's
+    # `executions.from-session` (decision U); the file then names the run.
+    no_goal = invoke("resume", row["execution_id"])
+    assert no_goal.exit_code != 0 and "has no goal to run on: say one with `--goal`" in plain(no_goal.output)
+    resumed = invoke("resume", row["execution_id"], "--goal", "Go on with the review")
+    assert resumed.exit_code == 0, resumed.output
+    assert f"Opened run exec_new_run from team session {row['execution_id']}: each seat goes on from its session (coder: " in plain(resumed.output)
+    [asked] = world.recorded["from_session"]
+    assert asked["team"] == TEAM and asked["objective"] == {"goal": "Go on with the review"}
+    assert asked["sessions"] == {one["id"]: one["session_uid"] for one in row["seats"]}
+    kept = TeamSessionStore().get(row["execution_id"])
+    assert kept["state"] == "open" and kept["run_execution_id"] == "exec_new_run"
+    again = invoke("resume", row["execution_id"], "--goal", "Again")
+    assert again.exit_code != 0 and "already runs as exec_new_run" in plain(again.output)
 
 
 def test_import_refuses_an_unknown_team_and_a_file_that_is_one_session(world: World, tmp_path: Path) -> None:
