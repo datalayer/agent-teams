@@ -147,7 +147,7 @@ def _catalogue_team(team_id: str) -> Any:
 def _format() -> Any:
     """The ``datalayer-session/1`` exporter and importer, which agent-runtimes ships."""
     try:
-        from agent_runtimes.loop.apps.session_files import DATALAYER_SESSION_FORMAT
+        from agent_runtimes.apps.session_files import DATALAYER_SESSION_FORMAT
     except ImportError as error:
         raise OrchestrationCommandError(
             "A session file is written and read by agent-runtimes' datalayer-session/1 format: "
