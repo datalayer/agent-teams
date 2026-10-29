@@ -13,12 +13,12 @@ from agent_teams.app import create_app
 from agent_teams.manager import TeamManager
 from agent_teams.types import AgentMemberConfig, ExecutionMode, TeamConfig
 
-from .conftest import make_echo_factory, make_team_config
+from .conftest import make_echo_factory, make_team_config, platform_with
 
 
 @pytest.fixture
 def client() -> TestClient:
-    manager = TeamManager(member_run_factory=make_echo_factory())
+    manager = TeamManager(platform=platform_with(make_echo_factory()))
     app = create_app(manager=manager)
     return TestClient(app)
 
@@ -186,3 +186,22 @@ class TestEventsRoutes:
         resp = client.get(f"/teams/{team_id}/events/history")
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
+
+
+class TestTheRunAsASession:
+    """`agent-teams local status <team>` shows the run as a team session with its seats (MH-23)."""
+
+    def test_a_started_team_shows_its_session_and_a_task_opens_a_seat(self, client: TestClient, config: TeamConfig):
+        client.post("/teams", json={"config": config.model_dump(mode="json")})
+        client.post(f"/teams/{config.id}/start")
+        shown = client.get(f"/teams/{config.id}").json()
+        assert shown["session"]["state"] == "open" and shown["session"]["seats"] == []
+        assert shown["session"]["team"]["id"] == config.id
+        client.post(f"/teams/{config.id}/tasks", json={"title": "Say hello", "description": "Say hello"})
+        shown = client.get(f"/teams/{config.id}").json()
+        seats = shown["session"]["seats"]
+        assert len(seats) == 1 and seats[0]["id"] == config.members[0].id
+        assert seats[0]["agent"] == "model:anthropic-claude-sonnet-4" and seats[0]["harness"] is None
+        client.post(f"/teams/{config.id}/stop")
+        assert client.get(f"/teams/{config.id}").json()["session"]["state"] == "ended"
+

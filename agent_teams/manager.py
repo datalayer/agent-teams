@@ -12,11 +12,16 @@ The TeamManager is responsible for the full lifecycle of agent teams:
 4. **Pause/Resume** — Suspend and resume execution.
 5. **Stop** — Graceful shutdown with result collection.
 
-It integrates:
-- Orchestration strategies (supervisor, sequential, parallel, graph)
-- The coordination protocol channel
-- Shared state (task list, artifact store)
-- Agent runtime connections (in-process or remote)
+It integrates, through the reactor (MH-F07, ``agent_teams.plugins``):
+- the orchestration of a run, one contribution per execution mode
+  (``teams.session.orchestration``: supervisor, sequential, parallel), which
+  also owns the run's seat sessions — a `graph` team is refused, nothing
+  serving it in another mode's place;
+- how each kind of seat runs a task (``teams.member.runner``: a model with a
+  prompt, a coding agent behind the Shield, a remote A2A worker), chosen by
+  the member's configuration;
+- the coordination protocol channel and the shared state (task list,
+  artifact store).
 
 Inspired by:
 - Agent-orchestrator's SessionManager (spawn/restore/kill lifecycle)
@@ -28,17 +33,20 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from datetime import datetime
-from typing import Any, Callable, Coroutine, Optional
+from typing import Any, Callable, Optional
+
+from reactor import PluginPlatform
 
 from .health import HealthConfig, HealthMonitor, HealthState
 from .hooks import HookEvent, HookRegistry, HookResult
 from .orchestration.base import BaseOrchestrator, MemberProxy, OrchestratorContext
-from .orchestration.parallel import ParallelOrchestrator
-from .orchestration.sequential import SequentialOrchestrator
-from .orchestration.supervisor import SupervisorOrchestrator
+from .plugins.host import orchestration_for, runner_for, teams_platform
+from .plugins.points import MemberRunner, RunFactory, runner_kind
 from .protocol.channel import InMemoryChannel, TeamChannel
 from .reactions import ReactionEngine, ReactionTrigger
+from .sessions.seats import SeatSessions
 from .state.artifact_store import ArtifactStore, InMemoryArtifactStore
 from .state.task_list import SharedTaskList
 from .types import (
@@ -46,7 +54,6 @@ from .types import (
     AgentMemberState,
     AssignTaskRequest,
     EventType,
-    ExecutionMode,
     MemberStatus,
     OrchestrationProtocol,
     TaskDefinition,
@@ -72,11 +79,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Type for the function that creates a run_fn for a member
-MemberRunFactory = Callable[
-    [AgentMemberConfig],
-    Callable[[str, dict[str, Any]], Coroutine[Any, Any, str]],
-]
+#: Makes a member's run function from its configuration: what a
+#: ``teams.member.runner`` contribution holds (`agent_teams.plugins.points`).
+MemberRunFactory = RunFactory
 
 
 class TeamManager:
@@ -84,15 +89,15 @@ class TeamManager:
 
     Example::
 
-        manager = TeamManager()
+        # How a model member runs is the host's: contributed to the
+        # `teams.member.runner` point of the platform the manager reads.
+        manager = TeamManager(platform=teams_platform(model=my_factory))
 
         # Create a team
         team_id = await manager.create_team(config)
 
-        # Register a factory that creates run functions for members
-        manager.set_member_run_factory(my_factory)
-
-        # Start the team
+        # Start the team: its orchestration and its seats' runners are read
+        # from the platform, and the run is a session owning one per seat.
         await manager.start_team(team_id)
 
         # Assign work
@@ -112,15 +117,19 @@ class TeamManager:
         self,
         channel: TeamChannel | None = None,
         artifact_store: ArtifactStore | None = None,
-        member_run_factory: MemberRunFactory | None = None,
         health_config: HealthConfig | None = None,
+        platform: PluginPlatform | None = None,
     ) -> None:
         self._teams: dict[str, TeamState] = {}
         self._orchestrators: dict[str, BaseOrchestrator] = {}
         self._contexts: dict[str, OrchestratorContext] = {}
         self._channel = channel or InMemoryChannel()
         self._artifact_store = artifact_store or InMemoryArtifactStore()
-        self._member_run_factory = member_run_factory
+        # What a run is made of comes from the reactor (MH-F07): the
+        # orchestration of its mode, and a runner per kind of seat.
+        self._platform = platform if platform is not None else teams_platform()
+        self._runners: dict[str, dict[str, MemberRunner]] = {}
+        self._sessions: dict[str, SeatSessions] = {}
         self._execution_tasks: dict[str, asyncio.Task] = {}
         # fasta2a A2A components (created per-team when protocol is A2A)
         self._a2a_brokers: dict[str, Any] = {}
@@ -132,19 +141,19 @@ class TeamManager:
         self._reaction_engines: dict[str, ReactionEngine] = {}
         self._hooks = HookRegistry()
 
-    def set_member_run_factory(self, factory: MemberRunFactory) -> None:
-        """Set the factory that creates run functions for agent members.
-
-        The factory receives an ``AgentMemberConfig`` and returns an
-        async callable ``(prompt, context) -> str`` that executes the
-        prompt on the underlying agent runtime.
-        """
-        self._member_run_factory = factory
+    @property
+    def platform(self) -> PluginPlatform:
+        """The plugin platform the manager reads its points from."""
+        return self._platform
 
     @property
     def hooks(self) -> HookRegistry:
         """Access the hook registry to add lifecycle hooks."""
         return self._hooks
+
+    def sessions_of(self, team_id: str) -> SeatSessions | None:
+        """The seat sessions of a team's run, while it runs."""
+        return self._sessions.get(team_id)
 
     def get_health_monitor(self, team_id: str) -> HealthMonitor | None:
         """Get the health monitor for a team."""
@@ -207,15 +216,29 @@ class TeamManager:
         if team.status not in (TeamStatus.DRAFT, TeamStatus.STOPPED, TeamStatus.PAUSED):
             raise ValueError(f"Cannot start team in {team.status} state")
 
-        team.status = TeamStatus.STARTING
-        team.started_at = datetime.utcnow()
-
         # Determine if A2A protocol should be used
         use_a2a = (
             team.config.orchestration_protocol
             in (OrchestrationProtocol.A2A, OrchestrationProtocol.A2A_EXTENDED)
             and _FASTA2A_AVAILABLE
         )
+
+        # What the run is made of, read from the platform before anything
+        # starts (MH-F07): the orchestration of its mode — `graph` and any
+        # mode nobody contributes refused in a sentence — and a runner per
+        # kind of seat, refused naming what to contribute when one is missing.
+        orchestration = orchestration_for(self._platform, team.config.execution_mode)
+        runners: dict[str, MemberRunner] = {}
+        for member_config in team.config.members:
+            kind = runner_kind(member_config, a2a=use_a2a)
+            if kind not in runners:
+                try:
+                    runners[kind] = runner_for(self._platform, kind)
+                except ValueError as refused:
+                    raise ValueError(f"{member_config.name}: {refused}") from None
+
+        team.status = TeamStatus.STARTING
+        team.started_at = datetime.utcnow()
 
         # Set up A2A infrastructure if needed
         if use_a2a:
@@ -224,8 +247,21 @@ class TeamManager:
         # Resolve the channel — use composite if any members are remote
         channel = self._resolve_channel(team.config, use_a2a)
 
-        # Create orchestrator based on execution mode
-        orchestrator = self._create_orchestrator(team.config.execution_mode)
+        orchestrator = orchestration.make()
+        # The run is a team session owning one session per seat, kept by the
+        # orchestration contribution: opened at the seat's first task,
+        # resumed at the next, ended with the run (decision S, decision T).
+        given = dict(team.session.get("given") or {})
+        sessions: SeatSessions = orchestration.sessions(
+            execution_id=str(team.session.get("execution_id") or f"{team_id}-{uuid.uuid4().hex[:8]}"),
+            team_id=team.config.id,
+            team_version=str(team.session.get("team", {}).get("version") or "0"),
+            owner_uid=team.config.owner or "",
+            members=list(team.config.members),
+            hooks=self._hooks,
+            given=given,
+        )
+        sessions.attach()
 
         # Create member proxies
         members: dict[str, MemberProxy] = {}
@@ -238,12 +274,8 @@ class TeamManager:
                     role=member_config.role,
                 )
 
-            run_fn = None
-            if use_a2a and member_config.agent_endpoint:
-                # Remote A2A agent — create A2A client run function
-                run_fn = self._create_a2a_run_fn(member_config)
-            elif self._member_run_factory:
-                run_fn = self._member_run_factory(member_config)
+            runner = runners[runner_kind(member_config, a2a=use_a2a)]
+            run_fn = sessions.wrap(member_config, runner.factory(member_config))
 
             proxy = MemberProxy(
                 config=member_config,
@@ -280,6 +312,9 @@ class TeamManager:
 
         self._orchestrators[team_id] = orchestrator
         self._contexts[team_id] = ctx
+        self._runners[team_id] = runners
+        self._sessions[team_id] = sessions
+        team.session = sessions.row()
 
         # -- Set up health monitoring -----------------------------------------
         monitor = HealthMonitor(config=self._health_config)
@@ -354,6 +389,17 @@ class TeamManager:
             for member_id in ctx.members:
                 await ctx.channel.unregister(member_id)
 
+        # What the runners held for the seats goes with the run: a harness's
+        # process and its channel (MH-23).
+        runners = self._runners.pop(team_id, {})
+        for member_config in team.config.members:
+            runner = runners.get(runner_kind(member_config, a2a=team_id in self._a2a_brokers))
+            if runner is not None and runner.end is not None:
+                try:
+                    await runner.end(member_config.id)
+                except Exception:  # noqa: BLE001 - the rest still stop
+                    logger.exception("Ending %s's runner failed", member_config.id)
+
         # Clean up A2A resources
         self._a2a_brokers.pop(team_id, None)
         self._a2a_workers.pop(team_id, None)
@@ -370,7 +416,18 @@ class TeamManager:
             )
         )
 
-        await self._hooks.run(HookEvent.POST_TEAM_STOP, team_id=team_id)
+        # `post-team-stop` ends the seats' sessions (decision S): the
+        # orchestration's owner registered itself on it.
+        sessions = self._sessions.pop(team_id, None)
+        await self._hooks.run(
+            HookEvent.POST_TEAM_STOP,
+            team_id=team_id,
+            execution_id=sessions.execution_id if sessions is not None else "",
+        )
+        if sessions is not None:
+            await sessions.end()
+            self._hooks.unregister(HookEvent.POST_TEAM_STOP, f"sessions:{sessions.execution_id}")
+            team.session = sessions.row()
         logger.info("Team '%s' stopped", team.config.name)
 
     async def pause_team(self, team_id: str) -> None:
@@ -380,6 +437,10 @@ class TeamManager:
             raise ValueError(f"Cannot pause team in {team.status} state")
 
         team.status = TeamStatus.PAUSED
+        sessions = self._sessions.get(team_id)
+        if sessions is not None:
+            await sessions.pause()
+            team.session = sessions.row()
         team.events.append(
             TeamEvent(
                 type=EventType.TEAM_PAUSED,
@@ -389,12 +450,16 @@ class TeamManager:
         )
 
     async def resume_team(self, team_id: str) -> None:
-        """Resume a paused team."""
+        """Resume a paused team: the run and each seat's session go on."""
         team = self._get_team(team_id)
         if team.status != TeamStatus.PAUSED:
             raise ValueError(f"Cannot resume team in {team.status} state")
 
         team.status = TeamStatus.RUNNING
+        sessions = self._sessions.get(team_id)
+        if sessions is not None:
+            await sessions.resume()
+            team.session = sessions.row()
         team.events.append(
             TeamEvent(
                 type=EventType.TEAM_RESUMED,
@@ -522,8 +587,12 @@ class TeamManager:
         return summaries
 
     def get_team(self, team_id: str) -> TeamState:
-        """Get the full state of a team."""
-        return self._get_team(team_id)
+        """Get the full state of a team, its run's session as it stands."""
+        team = self._get_team(team_id)
+        sessions = self._sessions.get(team_id)
+        if sessions is not None:
+            team.session = sessions.row()
+        return team
 
     def get_metrics(self, team_id: str) -> TeamMetrics:
         """Get metrics for a team."""
@@ -588,21 +657,6 @@ class TeamManager:
             if member.id == member_id:
                 return member
         return None
-
-    def _create_orchestrator(self, mode: ExecutionMode) -> BaseOrchestrator:
-        if mode == ExecutionMode.SUPERVISOR:
-            return SupervisorOrchestrator()
-        elif mode == ExecutionMode.SEQUENTIAL:
-            return SequentialOrchestrator()
-        elif mode == ExecutionMode.PARALLEL:
-            return ParallelOrchestrator()
-        elif mode == ExecutionMode.GRAPH:
-            # Graph orchestration could use pydantic-graph.
-            # For now, fall back to supervisor.
-            logger.info("Graph orchestration falling back to supervisor")
-            return SupervisorOrchestrator()
-        else:
-            raise ValueError(f"Unknown execution mode: {mode}")
 
     # ------------------------------------------------------------------
     # A2A (fasta2a) integration
@@ -682,58 +736,6 @@ class TeamManager:
 
         logger.info("A2A infrastructure initialized for team %s", team_id)
 
-    def _create_a2a_run_fn(
-        self,
-        member_config: AgentMemberConfig,
-    ) -> Callable[[str, dict[str, Any]], Coroutine[Any, Any, str]]:
-        """Create a run function that sends tasks to a remote A2A agent.
-
-        The function uses fasta2a's ``A2AClient`` to communicate with
-        the member's A2A endpoint.
-        """
-        endpoint = member_config.agent_endpoint
-
-        async def _a2a_run(prompt: str, context: dict[str, Any] | None = None) -> str:
-            if not _FASTA2A_AVAILABLE:
-                raise RuntimeError("fasta2a not installed — cannot call remote A2A agents")
-
-            from fasta2a.client import A2AClient
-            from fasta2a.schema import Message as A2AMessage, Part
-
-            import uuid
-
-            # `agent`, not `base_url` — see the note in a2a/channel.py.
-            client = A2AClient(agent=endpoint)
-            try:
-                message = A2AMessage(
-                    role="user",
-                    message_id=str(uuid.uuid4()),
-                    parts=[Part(text=prompt)],
-                    metadata=context or {},
-                )
-                response = await client.send_message(message)
-
-                # Extract result from response
-                result = response.get("result")
-                if result is None:
-                    error = response.get("error", {})
-                    raise RuntimeError(
-                        f"A2A error from {endpoint}: {error.get('message', 'Unknown error')}"
-                    )
-
-                # A2A v1: the result names what it is — `{"task": …}` or `{"message": …}` —
-                # where it used to carry a `kind`.
-                if isinstance(result, dict) and isinstance(result.get("task"), dict):
-                    return _extract_text_from_a2a_task(result["task"])
-                if isinstance(result, dict) and isinstance(result.get("message"), dict):
-                    return _extract_text_from_parts(result["message"].get("parts", []))
-
-                return str(result)
-            finally:
-                await client.http_client.aclose()
-
-        return _a2a_run
-
     def get_a2a_broker(self, team_id: str) -> Any:
         """Get the fasta2a broker for a team (if A2A is enabled)."""
         return self._a2a_brokers.get(team_id)
@@ -741,39 +743,3 @@ class TeamManager:
     def get_a2a_storage(self, team_id: str) -> Any:
         """Get the fasta2a storage for a team (if A2A is enabled)."""
         return self._a2a_storages.get(team_id)
-
-
-# ---------------------------------------------------------------------------
-# Module-level helpers for A2A response parsing
-# ---------------------------------------------------------------------------
-
-
-def _extract_text_from_a2a_task(task: dict[str, Any]) -> str:
-    """Extract text output from an A2A Task response."""
-    # Try artifacts first
-    artifacts = task.get("artifacts", [])
-    if artifacts:
-        texts = []
-        for art in artifacts:
-            for part in art.get("parts", []):
-                if "text" in part:
-                    texts.append(part.get("text", ""))
-        if texts:
-            return "\n".join(texts)
-
-    # Fall back to last agent message in history
-    history = task.get("history", [])
-    for msg in reversed(history):
-        if msg.get("role") == "agent":
-            return _extract_text_from_parts(msg.get("parts", []))
-
-    return ""
-
-
-def _extract_text_from_parts(parts: list[dict[str, Any]]) -> str:
-    """Extract text from A2A message parts."""
-    texts = []
-    for part in parts:
-        if "text" in part:
-            texts.append(part.get("text", ""))
-    return "\n".join(texts)
