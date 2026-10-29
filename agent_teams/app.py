@@ -6,9 +6,11 @@
 
 Usage
 -----
-Standalone::
+Standalone (an app factory: nothing is built when this module is imported)::
 
-    uvicorn agent_teams.app:app --reload
+    uvicorn --factory agent_teams.app:create_app --reload
+
+or ``agent-teams serve``.
 
 Mounted inside another application::
 
@@ -141,7 +143,3 @@ def create_app(
         return {"status": "ok", "teams": len(manager._teams)}
 
     return app
-
-
-# Convenience: ``uvicorn agent_teams.app:app``
-app = create_app()

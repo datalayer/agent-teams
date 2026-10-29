@@ -130,9 +130,10 @@ from .reactions import (
 from .manager import TeamManager
 
 # ---------------------------------------------------------------------------
-# App factory
+# App factory — lazy: importing the package never imports ``agent_teams.app``
+# (its routes, FastAPI) nor builds an app or a platform. ``create_app`` is
+# resolved on first access by the module ``__getattr__`` below.
 # ---------------------------------------------------------------------------
-from .app import create_app
 
 # ---------------------------------------------------------------------------
 # A2A integration (optional — requires fasta2a)
@@ -293,3 +294,11 @@ __all__ = [
     # A2A: the legacy team app (conditional on fasta2a's current message shape)
     *_A2A_APP_EXPORTS,
 ]
+
+
+def __getattr__(name: str):
+    if name == "create_app":
+        from .app import create_app
+
+        return create_app
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
