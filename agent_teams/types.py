@@ -201,6 +201,32 @@ class AgentMemberConfig(BaseModel):
     #: Shield instead of a model with a prompt (SHIELD SH-45): its tools are its
     #: own, decided by the Shield's policy, never this member's.
     harness: Optional[str] = None
+    #: An agent launched on Amazon Bedrock AgentCore as a team seat, by its
+    #: Datalayer deployment uid: asked over A2A through Datalayer's relay
+    #: (``DATALAYER_AI_AGENTS_URL``, with ``DATALAYER_API_KEY``), which exchanges
+    #: the key at Datalayer IAM for a token of that agent runtime. Its session
+    #: there is the seat's.
+    agentcore_deployment: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _an_agentcore_seat_is_reached_through_its_deployment(self) -> AgentMemberConfig:
+        if self.agentcore_deployment:
+            given = [
+                name
+                for name, value in (
+                    ("agent_endpoint", self.agent_endpoint),
+                    ("agent_spec_id", self.agent_spec_id),
+                    ("harness", self.harness),
+                )
+                if value
+            ]
+            if given:
+                raise ValueError(
+                    f"{self.name} is the agent of deployment {self.agentcore_deployment!r} on "
+                    f"AWS AgentCore: it takes no {', '.join(given)} (its deployment says what it runs "
+                    "and where it answers)"
+                )
+        return self
 
     @model_validator(mode="after")
     def _a_harness_is_the_agent_itself(self) -> AgentMemberConfig:

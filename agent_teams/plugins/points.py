@@ -10,7 +10,8 @@ A team is extended through the reactor and nothing else. Two points:
   runs a task. One contribution per kind — ``model`` (a model with a prompt),
   ``harness`` (a coding agent behind the Shield), ``a2a`` (a remote worker) —
   chosen by the member's configuration (:func:`runner_kind`): ``harness``
-  set → ``harness``; an ``agent_endpoint`` under an A2A team → ``a2a``; else
+  set → ``harness``; an ``agentcore_deployment`` (an agent on AWS AgentCore),
+  or an ``agent_endpoint`` under an A2A team → ``a2a``; else
   ``model``. agent-teams contributes ``a2a`` and ``harness``; the host — a
   server, agent-runtimes, a test — contributes ``model``.
 - ``teams.session.orchestration`` — an :class:`Orchestration`: how a run
@@ -107,6 +108,9 @@ def runner_kind(member: AgentMemberConfig, *, a2a: bool = False) -> str:
     """
     if member.harness:
         return "harness"
+    if member.agentcore_deployment:
+        # An agent on AWS AgentCore answers over A2A only, whatever the team talks.
+        return "a2a"
     if a2a and member.agent_endpoint:
         return "a2a"
     return "model"

@@ -168,3 +168,21 @@ a2a_app = A2ATeamApp(
 import uvicorn
 uvicorn.run(a2a_app.app, port=8765)
 ```
+
+## A Seat on AWS AgentCore
+
+A member can be an agent launched on Amazon Bedrock AgentCore as a team seat, named by its Datalayer deployment:
+
+```python
+from agent_teams.types import AgentMemberConfig
+
+researcher = AgentMemberConfig(
+    name="researcher",
+    role="researcher",
+    agentcore_deployment="<the deployment uid Datalayer answered at the launch>",
+)
+```
+
+Such a member is always asked over A2A, whatever the team talks. Each task goes through Datalayer's relay, `{DATALAYER_AI_AGENTS_URL}/api/ai-agents/v1/apps/deployments/<uid>/agentcore/a2a/sessions/<session>`, with `DATALAYER_API_KEY` as the bearer. Datalayer exchanges your key at its IAM for a token of that agent runtime, which IAM gives only to a member of the organization that runs it. The session in the path is the seat's session in the run, and it is also the message's A2A context, so every task of the seat and every `tasks/get` reaches the same AgentCore session. The runner follows a task the agent answered before it ended (`submitted`, `working`) until it ends. A task that ends any other way than `completed` fails the seat, in the agent's own words.
+
+The member names nothing else: no `agent_endpoint`, no `agent_spec_id`, no `harness`. Without `DATALAYER_AI_AGENTS_URL` and `DATALAYER_API_KEY`, its task is refused in a sentence.
