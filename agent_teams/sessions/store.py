@@ -28,7 +28,7 @@ from __future__ import annotations
 import builtins
 import json
 import os
-import uuid
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -61,9 +61,20 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+_CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
 def new_uid() -> str:
-    """A session uid: 8 to 128 letters, digits, hyphens or underscores."""
-    return uuid.uuid4().hex
+    """A new session's uid: a ULID, as every session the platform opens.
+
+    26 characters of Crockford's base32, the first ten the time in
+    milliseconds, so uids sort by when they were minted (agent-runtimes'
+    ``new_session_uid``, without importing it: agent-runtimes is an extra
+    here). Sessions opened before keep their 32-hexadecimal uids; a uid is
+    8 to 128 letters, digits, hyphens or underscores.
+    """
+    value = (int(time.time() * 1000) << 80) | int.from_bytes(os.urandom(10), "big")
+    return "".join(_CROCKFORD[(value >> shift) & 31] for shift in range(125, -1, -5))
 
 
 def check_state(word: str) -> str:
