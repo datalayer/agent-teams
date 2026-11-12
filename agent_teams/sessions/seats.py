@@ -32,7 +32,7 @@ from typing import Any, Callable
 
 from ..hooks import HookEvent, HookRegistry
 from ..types import AgentMemberConfig
-from .store import FileSessionStore, SessionRefused, TeamSessionStore, new_uid, now
+from .store import FileSessionStore, SessionRefused, TeamSessionStore, holder, new_uid, now
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +129,9 @@ class SeatSessions:
             "seats": [one.row() for one in self._seats.values()],
             "lineage": dict(self.lineage),
             "started_at": self._started_at,
+            # While it is open, the process that runs it: a run whose
+            # process is gone is ended as its file is read (the store).
+            **({"held_by": holder()} if self.state == "open" else {}),
         }
 
     def write_row(self) -> None:

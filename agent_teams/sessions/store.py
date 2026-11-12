@@ -26,8 +26,10 @@ open, paused or ended is refused in a sentence.
 from __future__ import annotations
 
 import builtins
+import hashlib
 import json
 import os
+import socket
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -187,6 +189,39 @@ def entries_up_to_turn(
     return kept
 
 
+def this_machine() -> str:
+    """This machine, as a file says it: a digest of its name, never the name
+    (agent-runtimes' ``local_rule.this_machine``, the same digest)."""
+    return hashlib.sha256(socket.gethostname().encode()).hexdigest()[:16]
+
+
+def holder() -> dict[str, Any]:
+    """The process that runs a team here: written on its run's file while
+    the run is open (``held_by``), so that a run whose process is gone —
+    it crashed, the machine restarted — is not said open for ever."""
+    return {"pid": os.getpid(), "host": this_machine()}
+
+
+def process_gone(held_by: Any) -> bool | None:
+    """Whether the process that held a run is gone from this machine;
+    ``None`` when that is not known (nobody said, or another machine)."""
+    if not isinstance(held_by, Mapping):
+        return None
+    try:
+        pid = int(held_by.get("pid") or 0)
+    except (TypeError, ValueError):
+        return None
+    if pid <= 0 or str(held_by.get("host") or "") != this_machine():
+        return None
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    except OSError:
+        return False
+    return False
+
+
 @dataclass
 class FileSessionStore:
     """Sessions in files, in the record's line shape: ``<root>/<uid>/entries.jsonl``."""
@@ -277,7 +312,38 @@ class TeamSessionStore:
 
     def get(self, execution_id: str) -> dict[str, Any] | None:
         path = self._file(execution_id)
-        return json.loads(path.read_text()) if path.is_file() else None
+        return self._reconciled(json.loads(path.read_text())) if path.is_file() else None
+
+    def _reconciled(self, row: dict[str, Any]) -> dict[str, Any]:
+        """A run as it is answered. **A paused session is always resumable**
+        (the rule of the platform's record, ``datalayer_solr/session_rule.py``,
+        and of agent-runtimes' ``apps/local_rule.py``; the three stay in
+        step): a run its file says is ``open`` whose process is gone from
+        this machine stopped without ending — it is ``ended``, and its
+        seats' sessions with it, written here as it is read. Nothing is
+        deleted: an ended run is cloned or exported."""
+        if row.get("state") != "open" or not process_gone(row.get("held_by")):
+            return row
+        why = f"Its team run {row.get('execution_id')} stopped without ending: its process is gone."
+        files = FileSessionStore()
+        for seat in row.get("seats") or []:
+            uid = str(seat.get("session_uid") or "")
+            described = files.describe(uid) if uid and files.exists(uid) else None
+            if described is not None and described["state"] != "ended":
+                files.append(
+                    uid,
+                    [
+                        {
+                            "kind": "ended",
+                            "summary": why,
+                            "payload": {"state": "ended", "by": "run", "why": why},
+                        }
+                    ],
+                )
+        ended = {**row, "state": "ended", "ended_why": why}
+        ended.pop("held_by", None)
+        self.put(ended)
+        return ended
 
     def put(self, row: Mapping[str, Any]) -> None:
         check_state(str(row.get("state") or ""))
@@ -289,7 +355,7 @@ class TeamSessionStore:
         """Every team session, newest first; one team's when named."""
         if not self.root.is_dir():
             return []
-        rows = [json.loads(p.read_text()) for p in self.root.glob("*.json")]
+        rows = [self._reconciled(json.loads(p.read_text())) for p in self.root.glob("*.json")]
         rows = [r for r in rows if not team or (r.get("team") or {}).get("id") == team]
         return sorted(rows, key=lambda r: str(r.get("started_at") or ""), reverse=True)
 
@@ -308,6 +374,9 @@ __all__ = [
     "check_state",
     "describe_session",
     "entries_up_to_turn",
+    "holder",
     "new_uid",
     "now",
+    "process_gone",
+    "this_machine",
 ]
