@@ -59,7 +59,7 @@ app = typer.Typer(
     ),
     # What a listing of this group among others shows (`datalayer --help`):
     # one line; the sentence above is this group's own `--help`.
-    short_help="Agent teams: run, follow and steer a team; `local` for a self-hosted server.",
+    short_help="Run, follow and steer a team of agents.",
     no_args_is_help=True,
 )
 
@@ -72,6 +72,7 @@ local_app = typer.Typer(
         "The teams of a self-hosted agent-teams server: create, list, assign, "
         "start, stop, pause, resume, delete, events, metrics."
     ),
+    short_help="Manage the teams of a self-hosted agent-teams server.",
     no_args_is_help=True,
 )
 app.add_typer(local_app)

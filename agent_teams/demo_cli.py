@@ -41,6 +41,7 @@ demo_app = typer.Typer(
         "The landing's demo team on Datalayer, under your account: deploy the members "
         "that run in the cloud, see how they stand, print their address, stop them."
     ),
+    short_help="Deploy, inspect and stop the landing's demo team under your account.",
     no_args_is_help=True,
 )
 
@@ -83,7 +84,10 @@ def deploy(
     ),
     output: OutputFormat = output_option(),
 ) -> None:
-    """Deploy the team's cloud members as you, over A2A, open to visitors; reuse what runs."""
+    """Deploy the team's cloud members as you, over A2A, open to visitors.
+
+    Deploy the team's cloud members as you, over A2A, open to visitors; reuse what runs.
+    """
     team = demo.read_team(team_id)
     cloud = demo.connect()
     handle = cloud.whoami()
@@ -296,7 +300,10 @@ def url(
         None, "--member", help="The member; the one on a runtime when there is one."
     ),
 ) -> None:
-    """Print only a deployed member's A2A address, for scripts; fail when it is not serving."""
+    """Print only a deployed member's A2A address, for scripts.
+
+    Print only a deployed member's A2A address, for scripts; fail when it is not serving.
+    """
     team = demo.read_team(team_id)
     member = team.member(member_id)
     cloud = demo.connect()

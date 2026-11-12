@@ -481,6 +481,7 @@ sessions_app = typer.Typer(
         "A team run as a session: list, show, resume, swap a seat, clone, export, import, end — "
         "the same verbs as `loop sessions`, at the team's level."
     ),
+    short_help="List, resume, clone and end team runs as sessions.",
     no_args_is_help=True,
 )
 
@@ -570,7 +571,10 @@ def resume(
     account: Optional[str] = account_option(),
     output: OutputFormat = output_option(),
 ) -> None:
-    """Let a paused run go on: the run and each seat's session with it; a clone or an import gets its run."""
+    """Let a paused run go on.
+
+    Let a paused run go on: the run and each seat's session with it; a clone or an import gets its run.
+    """
     session, record = _session(local, execution_id, account)
     if session["state"] == "ended":
         raise OrchestrationCommandError(
@@ -697,7 +701,10 @@ def swap(
     account: Optional[str] = account_option(),
     output: OutputFormat = output_option(),
 ) -> None:
-    """Swap a seat's agent in place and tell the supervisor; refused while the seat's turn runs."""
+    """Swap a seat's agent in place and tell the supervisor.
+
+    Swap a seat's agent in place and tell the supervisor; refused while the seat's turn runs.
+    """
     session, record = _session(local, execution_id, account)
     place = next((one for one in session["seats"] if one["id"] == seat), None)
     if place is None:

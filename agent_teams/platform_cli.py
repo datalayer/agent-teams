@@ -425,7 +425,10 @@ def pause(
     account: Optional[str] = account_option(),
     output: OutputFormat = output_option(),
 ) -> None:
-    """Ask a run to stop at its next checkpoint; nothing it did is lost."""
+    """Ask a run to stop at its next checkpoint.
+
+    Ask a run to stop at its next checkpoint; nothing it did is lost.
+    """
     command = call(
         lambda: ExecutionsPause(
             idempotency_key=_PENDING_KEY, execution_id=execution_id, reason=reason
@@ -504,7 +507,10 @@ def terminate(
     account: Optional[str] = account_option(),
     output: OutputFormat = output_option(),
 ) -> None:
-    """End a run for good and release its workers; `cancel` stops it and keeps them."""
+    """End a run for good and release its workers.
+
+    End a run for good and release its workers; `cancel` stops it and keeps them.
+    """
     command = call(
         lambda: ExecutionsTerminate(
             idempotency_key=_PENDING_KEY,
