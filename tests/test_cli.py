@@ -33,6 +33,23 @@ class TestCLIHelp:
         # The self-hosted server's teams are their own group now; `serve` stays at the top.
         assert "local" in plain(result.stdout) and "serve" in result.stdout
 
+    def test_listed_in_a_host_by_one_short_line(self):
+        # In `datalayer --help` the group is one line among fifty: the long
+        # sentence is its own `--help`, the listing shows the short one.
+        import typer
+
+        host = typer.Typer(name="host")
+        host.command("other")(lambda: None)
+        host.add_typer(app)
+        result = runner.invoke(host, ["--help"], env={"COLUMNS": "120", "NO_COLOR": "1", "TERM": "dumb"})
+        assert result.exit_code == 0
+        listing = plain(result.stdout)
+        assert "Agent teams: run, follow and steer a team" in listing
+        assert "catalogued" not in listing
+        assert len(app.info.short_help) <= 80
+        own = plain(runner.invoke(host, ["agent-teams", "--help"]).stdout)
+        assert "catalogued" in own
+
     def test_serve_help(self):
         result = runner.invoke(app, ["serve", "--help"])
         assert result.exit_code == 0

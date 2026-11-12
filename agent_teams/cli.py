@@ -57,6 +57,9 @@ app = typer.Typer(
         "follow, steer, pause, resume, cancel or terminate a run — and `local`, the teams "
         "of a self-hosted agent-teams server (`agent-teams serve`)."
     ),
+    # What a listing of this group among others shows (`datalayer --help`):
+    # one line; the sentence above is this group's own `--help`.
+    short_help="Agent teams: run, follow and steer a team; `local` for a self-hosted server.",
     no_args_is_help=True,
 )
 
