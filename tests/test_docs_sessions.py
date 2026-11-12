@@ -15,6 +15,7 @@ import re
 from pathlib import Path
 
 import pytest
+import typer
 from typer.testing import CliRunner
 
 pytest.importorskip("datalayer_core", reason="the sessions verbs need agent-teams[datalayer]")
@@ -25,13 +26,19 @@ DOCS = Path(__file__).resolve().parents[1] / "docs" / "docs" / "sessions"
 
 
 def _verbs() -> list[str]:
+    """The verbs of the `sessions` group, read from the group itself: a help
+    page wraps a long description at the terminal's width, and the first word
+    of a wrapped line is not a verb.
+    """
+    group = typer.main.get_command(app).commands["sessions"]  # type: ignore[attr-defined]
+    listed = [name for name, command in group.commands.items() if not command.hidden]
     result = CliRunner(env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"}).invoke(
         app, ["sessions", "--help"]
     )
     assert result.exit_code == 0, result.output
     text = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
-    commands = text.split("Commands")[-1]
-    return sorted(set(re.findall(r"^\W*\b([a-z]+)\b", commands, flags=re.M)) - {"help"})
+    assert all(re.search(rf"\b{verb}\b", text) for verb in listed), text
+    return sorted(listed)
 
 
 def test_every_sessions_verb_has_a_page_section() -> None:

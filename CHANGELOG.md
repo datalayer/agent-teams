@@ -6,7 +6,7 @@
 
 # Changelog
 
-## Unreleased
+## 1.1.5
 
 - **A self-hosted run whose process is gone is ended, and its seats' sessions with it.** A run's file says which process holds it while it is open (`held_by`: its pid, the machine as a digest); a run said `open` whose process is gone from this machine — it crashed, the machine restarted — is `ended` as its file is read (`agent-teams sessions list|show --local`), each seat's session with it, by the run. Nothing is deleted: an ended run is cloned or exported. The same rule as the platform's record and `loop sessions` keep: a paused session is always resumable.
 - **Resuming an ended team session names the command that clones it, whole**: `agent-teams sessions resume <run>` of an ended run says *clone it to go on from it (`agent-teams sessions clone <run>`)*, the run named. On Datalayer a seat's session now ends with its run whichever way the run ended — a failed one too — and `loop sessions` no longer lists it; `agent-teams sessions list --all` still lists ended runs, to clone or export.
