@@ -6,6 +6,10 @@
 
 # Changelog
 
+## Unreleased
+
+- **Resuming an ended team session names the command that clones it, whole**: `agent-teams sessions resume <run>` of an ended run says *clone it to go on from it (`agent-teams sessions clone <run>`)*, the run named. On Datalayer a seat's session now ends with its run whichever way the run ended — a failed one too — and `loop sessions` no longer lists it; `agent-teams sessions list --all` still lists ended runs, to clone or export.
+
 ## 1.1.4
 
 - **A team's seat session is opened with a ULID**, as every session the platform opens; sessions opened before keep their uids.

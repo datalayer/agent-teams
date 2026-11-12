@@ -575,7 +575,7 @@ def resume(
     if session["state"] == "ended":
         raise OrchestrationCommandError(
             f"Team session {execution_id} ended; an ended run is not resumed — clone it to go on from it "
-            "(`agent-teams sessions clone`)."
+            f"(`agent-teams sessions clone {execution_id}`)."
         )
     if local:
         raise OrchestrationCommandError(

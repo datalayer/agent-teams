@@ -18,7 +18,11 @@ Received, and the team goes on: each seat's session with it.
 Refused in a sentence:
 
 - an ended run — *Team session X ended; an ended run is not resumed — clone it
-  to go on from it (`agent-teams sessions clone`).*
+  to go on from it (`agent-teams sessions clone X`).* A run that is over —
+  completed, failed or cancelled — ends its seats' sessions with it: they are
+  no longer listed by `loop sessions`, which lists what runs or can be gone
+  on with; `agent-teams sessions list --all` lists ended runs, to clone or
+  export.
 - a run that is open — *Team session X is open, not paused.*
 - a team session that has no run yet (a clone, an import) is not refused: it
   gets its run (below).

@@ -270,6 +270,9 @@ def test_resume_lets_a_paused_run_go_on_and_refuses_an_ended_one(world: World, m
     ended = invoke("resume", ROOT)
     assert ended.exit_code != 0
     assert f"Team session {ROOT} ended; an ended run is not resumed — clone it to go on from it" in plain(ended.output)
+    # The command that goes on from it, whole: the run it clones is named.
+    said = " ".join(plain(ended.output).split())
+    assert f"agent-teams sessions clone {ROOT}" in said
     assert world.recorded["resumed"] == []
     paused = World(root_state=ExecutionState.PAUSED)
     monkeypatch.setattr(sessions_commands, "client", lambda: paused)
