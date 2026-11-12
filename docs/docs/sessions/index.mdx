@@ -1,0 +1,84 @@
+---
+title: The team session
+---
+
+# The team session
+
+A **team session** is one run of a team: the root execution the control plane
+runs the team under, its id the session's. It owns **one session per seat**,
+opened at the seat's first task and kept until the run ends — a seat's next
+task is a turn of the same session, not a new one. A team session is the same
+kind of thing as an agent-runtimes session, one level up: it is listed,
+resumed, cloned, exported, imported and ended with the same words, and the
+shapes are the same — a team session row is the run (its execution id, its
+team, its owner, its state, its lineage) plus its seats, each with its session
+as the record lists it (uid, state, agent, harness, turns).
+
+A team session's **state** is read from the run's execution state: `created`,
+`assigned`, `running`, `waiting` and `retrying` are `open`; `paused` is
+`paused`; `completed`, `failed`, `cancelled` and `terminated` are `ended`. Any
+other word is refused in a sentence, never mapped to something else.
+
+Where the seats' sessions live is the record's business, not the run's: on
+Datalayer, a seat's worker opens an apps session and answers its uid on the
+task result; the run carries that uid to the seat's next task and the commands
+read the session from the record by it. The control plane keeps no copy. On a
+self-hosted server (`agent-teams serve`), the seats' sessions are files under
+`~/.datalayer/sessions/<uid>/entries.jsonl` — the same root `loop sessions`
+reads — and the run is one file under `~/.datalayer/teams/sessions/`.
+
+```bash
+pip install "agent-teams[datalayer]"
+agent-teams sessions --help
+```
+
+Every verb takes `--local` to act on a self-hosted server's files instead of
+Datalayer's record, `--account` to act in an organization, and `-o json` for a
+machine-readable answer.
+
+## `agent-teams sessions list`
+
+The caller's team sessions: each run, its state, its seats with their
+sessions. The runs that are not over, unless `--all`; one team's with
+`--team`.
+
+```text
+$ agent-teams sessions list --team coding-agents --all
+                                                        2 team sessions
+┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┓
+┃ Execution            ┃ Team          ┃ State  ┃ Seats                                                                              ┃ Started             ┃
+┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━┩
+│ exec_8f1c…           │ coding-agents │ ended  │ coder: 1f3a… paused shield-mvp-claude-code (claude-code) 2 turns; reviewer: 9b0e… … │ 2026-10-21T10:07:03 │
+│ team-session-3c2a…   │ coding-agents │ paused │ coder: 7d2c… paused shield-mvp-claude-code (claude-code) 2 turns; reviewer: …        │ 2026-10-21T10:40:11 │
+└──────────────────────┴───────────────┴────────┴──────────────────────────────────────────────────────────────────────────────────────┴─────────────────────┘
+```
+
+A `team-session-…` row is a team session the control plane does not know yet:
+a clone or an import, waiting for its run (see [Clone](./clone) and
+[Export and import](./export-and-import)).
+
+## `agent-teams sessions show`
+
+One team session: the run, its state and lineage, each seat with its session.
+
+```text
+$ agent-teams sessions show exec_8f1c…
+exec_8f1c… · coding-agents · ended (completed)
+┏━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━┓
+┃ Seat     ┃ Session  ┃ State  ┃ Agent                  ┃ Harness     ┃ Turns ┃
+┡━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━┩
+│ coder    │ 1f3a…    │ paused │ shield-mvp-claude-code │ claude-code │ 2     │
+│ reviewer │ 9b0e…    │ paused │ shield-mvp-codex       │ codex       │ 1     │
+└──────────┴──────────┴────────┴────────────────────────┴─────────────┴───────┘
+```
+
+`agent-teams status <run>` shows the same seats' session lines beside the
+run's tree. A run that is not a team's is refused: *Execution X is not a team
+run (its agent is …): `agent-teams runs` lists the runs.*
+
+## What is not built yet
+
+- Forking the seats' **workspaces** with a clone: a clone copies the
+  conversations only.
+- The **swap** of a seat with `--local`: a self-hosted server's runner holds
+  the agent's process.

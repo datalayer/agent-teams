@@ -10,8 +10,10 @@ import asyncio
 from typing import Any
 
 import pytest
+from reactor import PluginPlatform
 
 from agent_teams.manager import MemberRunFactory, TeamManager
+from agent_teams.plugins.host import teams_platform
 from agent_teams.protocol.channel import InMemoryChannel
 from agent_teams.state.artifact_store import InMemoryArtifactStore
 from agent_teams.state.task_list import SharedTaskList
@@ -137,9 +139,21 @@ def echo_factory() -> MemberRunFactory:
     return make_echo_factory()
 
 
+def platform_with(model: MemberRunFactory | None = None, **kwargs: Any) -> PluginPlatform:
+    """A platform with the built-ins and the given `model` runner, nothing discovered."""
+    return teams_platform(model=model, discover_installed=False, **kwargs)
+
+
 @pytest.fixture
 def manager(echo_factory: MemberRunFactory) -> TeamManager:
-    return TeamManager(member_run_factory=echo_factory)
+    return TeamManager(platform=platform_with(echo_factory))
+
+
+@pytest.fixture(autouse=True)
+def sessions_in_tmp(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every run's sessions under the test's folder, never under ~/.datalayer."""
+    monkeypatch.setenv("AGENT_RUNTIMES_SESSIONS_PATH", str(tmp_path / "sessions"))
+    monkeypatch.setenv("AGENT_TEAMS_SESSIONS_PATH", str(tmp_path / "teams"))
 
 
 @pytest.fixture

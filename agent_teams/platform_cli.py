@@ -367,25 +367,49 @@ def status(
         }
         for execution in tree
     ]
-    if emit({"root": root.execution_id, "team": team_of(root), "executions": rows}, output):
+    # The run as a team session (MH-22): each seat's session line, read from
+    # the session API by the uid the seat's execution carries (MH-P05).
+    session: dict[str, Any] | None = None
+    if team_of(root) and root.depth == 0:
+        from agent_teams.sessions_commands import PlatformRecord, platform_team_session
+
+        session = platform_team_session(the_client, root, tree, PlatformRecord(the_client, account), account)
+        by_seat = {seat["id"]: seat for seat in session["seats"]}
+        for row in rows:
+            seat_id = row["executionId"] and next(
+                (one.agent.agent_id.rpartition("/")[2] for one in tree if one.execution_id == row["executionId"]),
+                "",
+            )
+            found = by_seat.get(seat_id)
+            row["session"] = (
+                {"uid": found["session_uid"], "state": found["state"], "agent": found["agent"], "turns": found["turns"]}
+                if found and found.get("session_uid")
+                else None
+            )
+    if emit(
+        {"root": root.execution_id, "team": team_of(root), "executions": rows, "session": session}, output
+    ):
         return
     ended = sum(1 for row in rows if row["status"] in _ENDED)
     console.print(
         f"{team_of(root) or 'Not a team run'} · {root.execution_id} · {_state(root)} · "
-        f"{ended} of {len(rows)} executions over",
+        f"{ended} of {len(rows)} executions over"
+        + (f" · team session {session['state']}" if session else ""),
         markup=False,
         highlight=False,
     )
     table = Table()
-    for column in ("Seat", "Status", "Attempts", "Updated", "Execution", "Error"):
+    for column in ("Seat", "Status", "Attempts", "Updated", "Execution", "Session", "Error"):
         table.add_column(column, overflow="fold")
     for row in rows:
+        kept = row.get("session")
         table.add_row(
             ("  " * row["depth"]) + row["seat"],
             row["status"],
             str(row["attempts"]),
             row["updatedAt"][:19],
             row["executionId"],
+            f"{kept['uid']} {kept['state']} {kept['agent']} {kept['turns']} turns" if kept else "",
             row["error"],
         )
     console.print(table)
@@ -401,7 +425,10 @@ def pause(
     account: Optional[str] = account_option(),
     output: OutputFormat = output_option(),
 ) -> None:
-    """Ask a run to stop at its next checkpoint; nothing it did is lost."""
+    """Ask a run to stop at its next checkpoint.
+
+    Ask a run to stop at its next checkpoint; nothing it did is lost.
+    """
     command = call(
         lambda: ExecutionsPause(
             idempotency_key=_PENDING_KEY, execution_id=execution_id, reason=reason
@@ -480,7 +507,10 @@ def terminate(
     account: Optional[str] = account_option(),
     output: OutputFormat = output_option(),
 ) -> None:
-    """End a run for good and release its workers; `cancel` stops it and keeps them."""
+    """End a run for good and release its workers.
+
+    End a run for good and release its workers; `cancel` stops it and keeps them.
+    """
     command = call(
         lambda: ExecutionsTerminate(
             idempotency_key=_PENDING_KEY,
@@ -533,6 +563,14 @@ def register(app: typer.Typer) -> None:
         "artifacts",
         help="What a run produced: the artifacts of its root and, by default, of every seat.",
     )(core_executions.artifacts)
+    # The landing's demo team, deployed under the person's account.
+    from agent_teams.demo_cli import register as register_demo
+
+    register_demo(app)
+    # A team run as a session: `agent-teams sessions …` (MH-41).
+    from agent_teams.sessions_commands import register as register_sessions
+
+    register_sessions(app)
 
 
 __all__ = ["register"]

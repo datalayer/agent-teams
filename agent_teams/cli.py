@@ -19,6 +19,14 @@ plane (``agent_teams.platform_cli``, needs ``agent-teams[datalayer]``)::
     agent-teams status <run>
     agent-teams monitor | steer | pause | resume | cancel | terminate | artifacts <run>
 
+The landing's demo team on Datalayer, under your account (``agent_teams.demo_cli``,
+needs ``agent-teams[demo]``)::
+
+    agent-teams demo deploy [--dry-run]
+    agent-teams demo status
+    agent-teams demo url
+    agent-teams demo stop
+
 A self-hosted agent-teams server, and the teams it holds::
 
     agent-teams serve --port 8765
@@ -49,6 +57,9 @@ app = typer.Typer(
         "follow, steer, pause, resume, cancel or terminate a run — and `local`, the teams "
         "of a self-hosted agent-teams server (`agent-teams serve`)."
     ),
+    # What a listing of this group among others shows (`datalayer --help`):
+    # one line; the sentence above is this group's own `--help`.
+    short_help="Run, follow and steer a team of agents.",
     no_args_is_help=True,
 )
 
@@ -61,6 +72,7 @@ local_app = typer.Typer(
         "The teams of a self-hosted agent-teams server: create, list, assign, "
         "start, stop, pause, resume, delete, events, metrics."
     ),
+    short_help="Manage the teams of a self-hosted agent-teams server.",
     no_args_is_help=True,
 )
 app.add_typer(local_app)

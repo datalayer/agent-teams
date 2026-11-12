@@ -13,6 +13,47 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/agent-teams)](https://pypi.org/project/agent-teams)
 [![npm](https://img.shields.io/npm/v/%40datalayer%2Fagent-teams)](https://www.npmjs.com/package/@datalayer/agent-teams)
 
+## The demo team
+
+`datalayer agent-teams demo` deploys the landing's demo team on Datalayer,
+under your own account: the members of the agentspecs team
+`sales-and-accounting` that run in the cloud (Accounting) each get a runtime
+of yours, serving their application over A2A, open to visitors.
+
+```bash
+pip install "agent-teams[demo]"
+datalayer agent-teams demo deploy --dry-run   # what it would launch, and cost
+datalayer agent-teams demo deploy             # prints demoTeam.accountingA2AUrl for the landing
+datalayer agent-teams demo status
+datalayer agent-teams demo url
+datalayer agent-teams demo stop
+```
+
+With `DATALAYER_MAGIC_API_KEY` set (the platform's magic key, a secret), the
+runtime is launched unmetered: no credits, and it never expires; `--dry-run`
+says `unmetered: yes` and `status` shows `never` for the time left. See the
+[CLI reference](docs/docs/cli/index.mdx#the-demo-team).
+
+## Running on Datalayer, and on your own
+
+The library runs a team on its own: `TeamManager`, the local orchestrators
+and the file stores need no platform. Two extras turn the platform on:
+
+- `pip install "agent-teams[datalayer]"` — the `datalayer agent-teams …`
+  group of the Datalayer CLI (`list|start|runs|status|steer|sessions …`),
+  which talks to the control plane with your login (`datalayer login`, or
+  `DATALAYER_API_KEY`); `agent-teams sessions …` reads and writes the seats'
+  sessions in the platform's record when `DATALAYER_AI_AGENTS_URL` or
+  `DATALAYER_API_KEY` is set, and `--local` reads a self-hosted server's files
+  (`AGENT_TEAMS_SESSIONS_PATH`, `AGENT_RUNTIMES_SESSIONS_PATH`) instead.
+- `pip install "agent-teams[shield]"` — a coding agent (Claude Code, Codex,
+  …) as a team member, run behind the Shield.
+
+Nothing in this package is private to Datalayer: the control plane's routes
+it calls are the [orchestration API](https://datalayer.ai/extensions/orchestration/v1)
+and ai-agents' session routes, and a self-hosted agent-runtimes server
+answers the same verbs on its own files.
+
 ## The Datalayer orchestration extension
 
 `agent_teams.a2a` (Python) and `@datalayer/agent-teams` (TypeScript)

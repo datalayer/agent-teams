@@ -1,0 +1,37 @@
+---
+title: Clone
+---
+
+# Clone a team session
+
+## `agent-teams sessions clone`
+
+```bash
+agent-teams sessions clone <run> [--title "…"] [--seat <id> --at <turn>]
+```
+
+A new team session, `paused`, whose seats are clones of the run's seats'
+sessions: each seat's session copied under a new uid through the record
+(`cloned` written on both; with `--local`, copied in the file store), whole —
+or, for the one seat named with `--seat`, up to the turn `--at` names. No
+workspace is forked: a clone copies the conversations only. An ended run
+clones like any other: it is the way to go on from one.
+
+```text
+$ agent-teams sessions clone exec_8f1c… --title "Before the review"
+Cloned exec_8f1c… as team-session-3c2a… (paused): coder → 7d2c…, reviewer → a41e…. Resume it: agent-teams sessions resume team-session-3c2a…
+```
+
+The clone is kept as a team session file (the control plane cannot hold a run
+that has no execution yet), listed and shown by `sessions list` and `sessions
+show` with its lineage — *cloned from exec_8f1c…* — and each seat's session
+with `forked_from: {uid, at_turn}`.
+
+Refused in a sentence:
+
+- a turn the seat does not have (422) — *Seat coder's session has 2 turns;
+  there is no turn 7 to clone it at.*
+- `--seat` without `--at`, or the reverse — *`--seat` and `--at` go together:
+  the seat, and the turn its session is cut at.*
+- a seat that kept no session — *Seat reviewer kept no session: there is
+  nothing to cut at turn 3.*
