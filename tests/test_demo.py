@@ -45,7 +45,7 @@ NAME = "agent-teams-demo-sales-and-accounting-accounting"
 
 #: The Appspec agentspecs holds for Accounting, in short.
 ACCOUNTING = {
-    "schema": "loop.app/v1",
+    "schema": "agent.app/v1",
     "id": "accounting",
     "version": "0.0.1",
     "name": "Accounting",

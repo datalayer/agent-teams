@@ -8,7 +8,7 @@ A seat's session is kept as the record keeps any session — one folder per
 session, ``<root>/<uid>/entries.jsonl``, one entry a line in the record's
 line shape — under the same root agent-runtimes' file session store reads
 (``~/.datalayer/sessions``, or ``AGENT_RUNTIMES_SESSIONS_PATH``), so
-``loop sessions list`` lists a seat's session beside any other. A harness
+``agent sessions list`` lists a seat's session beside any other. A harness
 seat's own session — the ACP session id and the workspace, what a
 ``session/load`` needs — sits beside the entries as ``harness_session.json``.
 

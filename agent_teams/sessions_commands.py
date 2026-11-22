@@ -6,7 +6,7 @@
 
 A team session is one run of a team — the root execution the control plane
 runs it under, its id the session's — that owns one session per seat, kept
-across the run's tasks. The verbs are ``loop sessions …``'s, at the team's
+across the run's tasks. The verbs are ``agent sessions …``'s, at the team's
 level, one API shape at both levels: a team session row is the run (its
 execution id, team, owner, state, lineage) plus its seats, each with its
 session as the record lists it (uid, state, agent, harness, turns).
@@ -479,7 +479,7 @@ sessions_app = typer.Typer(
     name="sessions",
     help=(
         "A team run as a session: list, show, resume, swap a seat, clone, export, import, end — "
-        "the same verbs as `loop sessions`, at the team's level."
+        "the same verbs as `agent sessions`, at the team's level."
     ),
     short_help="List, resume, clone and end team runs as sessions.",
     no_args_is_help=True,
@@ -1005,7 +1005,7 @@ def _segments(  # noqa: C901
     head, _ = parsed[0]
     if head.record_type == "session":
         raise OrchestrationCommandError(
-            "The file's first line is one session, not a team session: import it with `loop sessions import`."
+            "The file's first line is one session, not a team session: import it with `agent sessions import`."
         )
     if head.record_type != "team_session":
         raise OrchestrationCommandError(

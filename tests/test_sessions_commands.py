@@ -438,7 +438,7 @@ def test_import_refuses_an_unknown_team_and_a_file_that_is_one_session(world: Wo
     assert unknown.exit_code != 0 and "No team 'no-such-team' is catalogued" in plain(unknown.output)
     (tmp_path / "one.jsonl").write_text("\n".join(lines[1:]) + "\n")
     one = invoke("import", str(tmp_path / "one.jsonl"))
-    assert one.exit_code != 0 and "import it with `loop sessions import`" in plain(one.output)
+    assert one.exit_code != 0 and "import it with `agent sessions import`" in plain(one.output)
     missing = invoke("import", str(tmp_path / "none.jsonl"))
     assert missing.exit_code != 0 and "There is no file" in plain(missing.output)
 

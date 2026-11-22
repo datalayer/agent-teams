@@ -12,7 +12,7 @@ runs on a runtime: one cloud runtime per member, created as the person, named
 for the team and the member so that the next deploy finds it again, and
 configured with the member's application served over A2A — the runtime's
 ``POST /api/v1/apps/configure`` with ``a2a: true``, the call
-``loop apps run <app> --cloud --a2a`` makes, plus the field that opens the
+``agent apps run <app> --cloud --a2a`` makes, plus the field that opens the
 application to the landing's visitors (:data:`VISITORS_FIELD`).
 
 What is read and what is launched goes through agent-runtimes' client — the
@@ -63,7 +63,7 @@ READY_TIMEOUT = 300.0
 A2A_ROUTE = "/api/v1/a2a/agents/{app}/"
 
 #: The agentspec a new runtime starts with before the application replaces it
-#: (agent-runtimes' ``BOOTSTRAP_AGENT_SPEC_ID``, what ``loop apps run`` starts with).
+#: (agent-runtimes' ``BOOTSTRAP_AGENT_SPEC_ID``, what ``agent apps run`` starts with).
 BOOTSTRAP_AGENT_SPEC_ID = "example-simple"
 
 #: The agent a runtime holds, which the application is configured on.
@@ -218,7 +218,7 @@ def read_team(team_id: str) -> DemoTeam:
 
 def _launch() -> Any:
     try:
-        from agent_runtimes.loop import launch
+        from agent_runtimes.agent import launch
     except ImportError as error:
         raise OrchestrationCommandError(NEEDS_DEMO_EXTRA) from error
     return launch

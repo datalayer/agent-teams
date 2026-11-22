@@ -24,7 +24,7 @@ Datalayer, a seat's worker opens an apps session and answers its uid on the
 task result; the run carries that uid to the seat's next task and the commands
 read the session from the record by it. The control plane keeps no copy. On a
 self-hosted server (`agent-teams serve`), the seats' sessions are files under
-`~/.datalayer/sessions/<uid>/entries.jsonl` — the same root `loop sessions`
+`~/.datalayer/sessions/<uid>/entries.jsonl` — the same root `agent sessions`
 reads — and the run is one file under `~/.datalayer/teams/sessions/`.
 
 ```bash
