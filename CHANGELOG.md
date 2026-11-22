@@ -6,7 +6,7 @@
 
 # Changelog
 
-## Unreleased
+## 1.1.6
 
 - **agent-runtimes 1.8.0's names**: the demo team launches through `agent_runtimes.agent` (was `agent_runtimes.loop`), and the docs, help and errors name the `agent` CLI (`agent apps run`, `agent sessions list|import`). The `demo` extra requires `agent-runtimes>=1.8.0`.
 
