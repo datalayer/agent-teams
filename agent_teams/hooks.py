@@ -45,6 +45,19 @@ class HookEvent(str, Enum):
     ON_TASK_FAILED = "on-task-failed"
     ON_MEMBER_ERROR = "on-member-error"
 
+    # The team session and its seats' sessions (MH-F07, decision S): the
+    # same events the runtime's `session.hook` point has, fired by the run's
+    # orchestration — a seat's first task opens, its next resumes, the run's
+    # end ends; a swap, clone, export or import of the team session says so.
+    # A hook that disallows refuses the operation with its reason.
+    SESSION_OPEN = "session-open"
+    SESSION_RESUME = "session-resume"
+    SESSION_SWAP = "session-swap"
+    SESSION_CLONE = "session-clone"
+    SESSION_EXPORT = "session-export"
+    SESSION_IMPORT = "session-import"
+    SESSION_END = "session-end"
+
 
 @dataclass
 class HookResult:

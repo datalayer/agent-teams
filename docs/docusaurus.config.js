@@ -15,6 +15,7 @@ module.exports = {
   organizationName: 'datalayer',
   projectName: 'datalayer',
   markdown: {
+    format: 'detect',
     mermaid: true,
   },
   plugins: [
@@ -151,14 +152,6 @@ module.exports = {
             {
               label: 'Datalayer AI',
               href: 'https://datalayer.ai',
-            },
-            {
-              label: 'Datalayer App',
-              href: 'https://datalayer.app',
-            },
-            {
-              label: 'Datalayer Docs',
-              href: 'https://docs.datalayer.app',
             },
             {
               label: 'Datalayer Blog',

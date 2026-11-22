@@ -29,9 +29,40 @@ class TestCLIHelp:
     def test_main_help(self):
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
-        assert "Agent teams:" in plain(result.stdout)
+        assert "the catalogued teams run on Datalayer" in " ".join(plain(result.stdout).split())
         # The self-hosted server's teams are their own group now; `serve` stays at the top.
         assert "local" in plain(result.stdout) and "serve" in result.stdout
+
+    def test_listed_in_a_host_by_one_short_line(self):
+        # In `datalayer --help` the group is one line among fifty: the long
+        # sentence is its own `--help`, the listing shows the short one.
+        import typer
+
+        host = typer.Typer(name="host")
+        host.command("other")(lambda: None)
+        host.add_typer(app)
+        result = runner.invoke(host, ["--help"], env={"COLUMNS": "120", "NO_COLOR": "1", "TERM": "dumb"})
+        assert result.exit_code == 0
+        listing = plain(result.stdout)
+        assert "Run, follow and steer a team of agents." in listing
+        assert "catalogued" not in listing
+        assert len(app.info.short_help) <= 80
+        own = plain(runner.invoke(host, ["agent-teams", "--help"]).stdout)
+        assert "catalogued" in own
+
+    def test_every_description_keeps_the_house_style(self):
+        # One sentence ending with a period, a capital, short enough not to
+        # wrap, not opening with the command's own name — as the Datalayer
+        # CLI lists what this package contributes to it.
+        import typer
+        from reactor.cli import help_style_violations
+
+        from agent_teams.reactor_extension import plugin
+
+        host = typer.Typer(name="datalayer")
+        host.command("other", help="Do the other thing.")(lambda: None)
+        plugin()[1].provide_cli(host)
+        assert help_style_violations(host) == []
 
     def test_serve_help(self):
         result = runner.invoke(app, ["serve", "--help"])

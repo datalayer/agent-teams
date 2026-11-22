@@ -16,7 +16,7 @@ from agent_teams.types import (
     TeamStatus,
 )
 
-from .conftest import make_echo_factory, make_member, make_team_config
+from .conftest import make_echo_factory, make_member, make_team_config, platform_with
 
 
 class TestTeamManagerLifecycle:
@@ -24,7 +24,7 @@ class TestTeamManagerLifecycle:
 
     @pytest.fixture
     def mgr(self) -> TeamManager:
-        return TeamManager(member_run_factory=make_echo_factory())
+        return TeamManager(platform=platform_with(make_echo_factory()))
 
     @pytest.fixture
     def config(self) -> TeamConfig:
@@ -99,7 +99,7 @@ class TestTeamManagerTasks:
 
     @pytest.fixture
     def mgr(self) -> TeamManager:
-        return TeamManager(member_run_factory=make_echo_factory())
+        return TeamManager(platform=platform_with(make_echo_factory()))
 
     async def test_assign_task(self, mgr: TeamManager):
         config = make_team_config()
@@ -130,7 +130,7 @@ class TestTeamManagerMetrics:
 
     @pytest.fixture
     def mgr(self) -> TeamManager:
-        return TeamManager(member_run_factory=make_echo_factory())
+        return TeamManager(platform=platform_with(make_echo_factory()))
 
     async def test_get_metrics(self, mgr: TeamManager):
         config = make_team_config()
@@ -162,7 +162,7 @@ class TestTeamManagerExecutionModes:
 
     @pytest.fixture
     def mgr(self) -> TeamManager:
-        return TeamManager(member_run_factory=make_echo_factory())
+        return TeamManager(platform=platform_with(make_echo_factory()))
 
     async def test_sequential_mode(self, mgr: TeamManager):
         config = make_team_config(execution_mode=ExecutionMode.SEQUENTIAL)
