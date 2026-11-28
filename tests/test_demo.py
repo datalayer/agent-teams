@@ -50,7 +50,7 @@ ACCOUNTING = {
     "version": "0.0.1",
     "name": "Accounting",
     "kind": "chat",
-    "agent": "worker-accountant:0.0.1",
+    "agent": "accountant:0.0.1",
     "connections": [{"server": "odoo-accounting:0.0.1", "access": "read", "as": "owner"}],
     "rules": [
         {"action": "Read the books", "applies_to": "read", "behaviour": "do_it"},
@@ -235,7 +235,7 @@ class TestTheTeam:
         assert [m.id for m in team.hosted] == ["accounting"]
         accounting = team.hosted[0]
         assert accounting.app_id == "accounting"
-        assert accounting.document["agent"] == "worker-accountant:0.0.1"
+        assert accounting.document["agent"] == "accountant:0.0.1"
         assert accounting.label == "🧾 Accounting"
 
     def test_an_unknown_team_is_refused(self) -> None:
@@ -746,6 +746,6 @@ def test_the_catalogued_team_hosts_accounting(monkeypatch: pytest.MonkeyPatch) -
     team = demo.read_team(demo.DEMO_TEAM)
     [accounting] = team.hosted
     assert accounting.id == "accounting"
-    assert accounting.document["agent"].startswith("worker-accountant")
+    assert accounting.document["agent"].startswith("accountant")
     assert accounting.document["connections"][0]["server"].startswith("odoo-accounting")
     assert [m.runs_in for m in team.members] == ["browser", "runtime"]
